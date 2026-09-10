@@ -2,9 +2,11 @@
 :description: This script runs the Eclipse ThreadX demo on NXP i.MX RT1064-EVK.
 
 mach create "mimxrt1064-evk"
-machine LoadPlatformDescription @platforms/boards/mimxrt1064_evk.repl
 
-$bin?=@$ORIGIN/../build/mimxrt1064_threadx.elf
+$platform?=$ORIGIN/mimxrt1064-evk.repl
+machine LoadPlatformDescription $platform
+
+$bin?=$ORIGIN/../build/mimxrt1064_threadx.elf
 
 showAnalyzer sysbus.lpuart1
 

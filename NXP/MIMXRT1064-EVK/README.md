@@ -13,7 +13,8 @@ The project is designed to run seamlessly both in the **Antmicro Renode** simula
 * **Flash Memory**: 4 MB internal FlexSPI NOR Flash (XIP)
 * **Internal SRAM**: 1 MB on-chip RAM (Configurable as ITCM, DTCM, and OCRAM)
 * **Debug Serial Console**: LPUART1 (115,200 baud, 8N1)
-* **User LED**: GPIO9 Pin 3 (`GPIO_AD_B0_09`) / User LED (Green)
+* **User LED**: GPIO1 Pin 9 (`GPIO_AD_B0_09`) / User LED D18 (Green)
+* **User Button**: GPIO5 Pin 0 (SW8 WAKEUP button)
 * **Virtual Networking**: ENET1 (10/100M Fast Ethernet MAC via KSZ8081 PHY)
 
 ---
@@ -25,17 +26,30 @@ NXP/MIMXRT1064-EVK/
 ├── CMakeLists.txt              # Top-level CMake build configuration
 ├── NOTICE.md                   # Third-party licensing notices (NXP BSD-3 & CMSIS)
 ├── README.md                   # This documentation file
+├── app/
+│   ├── main.c                  # ThreadX application entry, Heartbeat & Worker threads
+│   ├── board_init.c / .h       # Clocks (600 MHz), MPU, pin muxing & User LED init
+│   ├── console.c / .h          # LPUART1 serial driver & POSIX printf retargeting
+│   ├── syscalls.c / sysmem.c   # Minimal C runtime system call stubs
+│   └── startup/
+│       ├── startup_mimxrt1064.S            # NXP vector table & reset handler
+│       ├── tx_initialize_low_level.S       # ThreadX Cortex-M7 low-level init & SysTick
+│       └── MIMXRT1064xxxxx_flexspi_nor.ld  # FlexSPI NOR XIP GNU linker script
 ├── cmake/
 │   ├── arm-gcc-cortex-m7.cmake         # CPU architecture and FPU definitions
 │   ├── arm-gcc-cortex-toolchain.cmake  # GNU toolchain discovery and compiler flags
 │   └── utilities.cmake                 # Elf-to-bin/hex conversion and linker macros
 ├── lib/
 │   ├── threadx/
-│   │   └── tx_user.h           # ThreadX configuration (hardware FPU enabled)
+│   │   └── tx_user.h           # ThreadX configuration (hardware FPU enabled, 100 Hz tick)
 │   └── mcux-sdk/               # Official NXP SDK drivers (fetched via script)
+├── renode/
+│   ├── mimxrt1064-evk.repl     # Board platform description (memory, LED, button)
+│   └── mimxrt1064-evk.resc     # Renode simulation script (LPUART1 analyzer & LED logging)
 └── scripts/
     ├── fetch_sdk.ps1 / .sh     # Download official NXP drivers, device headers & CMSIS
-    └── build.ps1 / .sh         # One-command build script with Ninja/CMake
+    ├── build.ps1 / .sh         # One-command build script with Ninja/CMake
+    └── simulate.ps1 / .sh      # Launch Renode simulation with serial monitor
 ```
 
 ---
@@ -78,6 +92,19 @@ Compile the application, vendor drivers, and Eclipse ThreadX kernel:
   ```bash
   chmod +x ./scripts/build.sh
   ./scripts/build.sh --rebuild
+  ```
+
+### 3. Run the Simulation in Renode
+Launch the interactive Renode simulation:
+
+* **On Windows (PowerShell)**:
+  ```powershell
+  .\scripts\simulate.ps1
+  ```
+* **On Linux / macOS (Bash)**:
+  ```bash
+  chmod +x ./scripts/simulate.sh
+  ./scripts/simulate.sh
   ```
 
 ---
