@@ -112,6 +112,7 @@ static void heartbeat_thread_entry(ULONG thread_input)
 {
     (void)thread_input;
     ULONG count = 0;
+    uint8_t led_state = 0;
 
     printf("[Heartbeat Thread] Started.\r\n");
 
@@ -121,8 +122,12 @@ static void heartbeat_thread_entry(ULONG thread_input)
         tx_thread_sleep(50);
         count++;
 
-        printf("[Heartbeat Thread] Heartbeat #%lu (System Tick: %lu)\r\n",
-               count, tx_time_get());
+        /* Toggle User LED (D18) on GPIO1 Pin 9 */
+        USER_LED_TOGGLE();
+        led_state = !led_state;
+
+        printf("[Heartbeat Thread] Heartbeat #%lu (System Tick: %lu | User LED: %s)\r\n",
+               count, tx_time_get(), led_state ? "ON" : "OFF");
     }
 }
 
