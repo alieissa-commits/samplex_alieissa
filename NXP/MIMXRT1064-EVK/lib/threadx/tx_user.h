@@ -20,7 +20,7 @@
 
 /* System tick frequency in Hz (typically 100 or 1000) */
 #ifndef TX_TIMER_TICKS_PER_SECOND
-#define TX_TIMER_TICKS_PER_SECOND 1000
+#define TX_TIMER_TICKS_PER_SECOND 100
 #endif
 
 #endif /* TX_USER_H */

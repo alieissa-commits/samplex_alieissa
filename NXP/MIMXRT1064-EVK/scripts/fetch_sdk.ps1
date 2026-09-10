@@ -33,6 +33,8 @@ New-Item -ItemType Directory -Path $UtilitiesDir -Force | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $ComponentsDir "uart") -Force | Out-Null
 New-Item -ItemType Directory -Path $BoardFilesDir -Force | Out-Null
 New-Item -ItemType Directory -Path $CmsisIncludeDest -Force | Out-Null
+$AppStartupDir = Join-Path $BoardDir "app/startup"
+New-Item -ItemType Directory -Path $AppStartupDir -Force | Out-Null
 
 if (Test-Path $TempDir) { Remove-Item -Path $TempDir -Recurse -Force }
 New-Item -ItemType Directory -Path $TempDir -Force | Out-Null
@@ -125,6 +127,21 @@ try {
     Write-Host "[OK] NXP Device, Driver, Utility, and Component files copied"
     Write-Host ""
 
+    # Helper function to download with retries for GitHub CDN resilience
+    function Download-WithRetry {
+        param([string]$Uri, [string]$OutFile, [int]$MaxAttempts = 4)
+        for ($i = 1; $i -le $MaxAttempts; $i++) {
+            try {
+                Invoke-WebRequest -Uri $Uri -OutFile $OutFile -UseBasicParsing -TimeoutSec 30
+                return
+            }
+            catch {
+                if ($i -eq $MaxAttempts) { throw $_ }
+                Start-Sleep -Seconds 2
+            }
+        }
+    }
+
     # 2. Download EVK-MIMXRT1064 Board Initialization Files from official NXP mcuxsdk-examples
     $rawBase = "https://raw.githubusercontent.com/nxp-mcuxpresso/mcuxsdk-examples/main/_boards/evkmimxrt1064"
     $boardFiles = @(
@@ -137,16 +154,28 @@ try {
         @{ Remote = "$rawBase/dcd.c"; Local = "dcd.c" },
         @{ Remote = "$rawBase/dcd.h"; Local = "dcd.h" },
         @{ Remote = "$rawBase/xip/evkmimxrt1064_flexspi_nor_config.c"; Local = "evkmimxrt1064_flexspi_nor_config.c" },
-        @{ Remote = "$rawBase/xip/evkmimxrt1064_flexspi_nor_config.h"; Local = "evkmimxrt1064_flexspi_nor_config.h" },
-        @{ Remote = "$rawBase/linker/mcux/MIMXRT1064xxxxx_flexspi_nor.ld"; Local = "MIMXRT1064xxxxx_flexspi_nor.ld" }
+        @{ Remote = "$rawBase/xip/evkmimxrt1064_flexspi_nor_config.h"; Local = "evkmimxrt1064_flexspi_nor_config.h" }
     )
 
     Write-Host "[INFO] Downloading EVK-MIMXRT1064 board support files..."
     foreach ($item in $boardFiles) {
         $dest = Join-Path $BoardFilesDir $item.Local
-        Invoke-WebRequest -Uri $item.Remote -OutFile $dest -UseBasicParsing
+        Download-WithRetry -Uri $item.Remote -OutFile $dest
     }
-    Write-Host "[OK] Board support files downloaded"
+
+    # Download official GNU GCC Linker Script & Startup File from official NXP mcux-sdk repository
+    Write-Host "[INFO] Downloading official NXP GNU GCC Linker Script and Startup File..."
+    $nxpGccBase = "https://raw.githubusercontent.com/nxp-mcuxpresso/mcux-sdk/main/devices/MIMXRT1064/gcc"
+    $ldDestBoard = Join-Path $BoardFilesDir "MIMXRT1064xxxxx_flexspi_nor.ld"
+    $ldDestApp = Join-Path $AppStartupDir "MIMXRT1064xxxxx_flexspi_nor.ld"
+    $startupDest = Join-Path $AppStartupDir "startup_mimxrt1064.S"
+
+    Download-WithRetry -Uri "$nxpGccBase/MIMXRT1064xxxxx_flexspi_nor.ld" -OutFile $ldDestBoard
+    Copy-Item -Path $ldDestBoard -Destination $ldDestApp -Force
+
+    Download-WithRetry -Uri "$nxpGccBase/startup_MIMXRT1064.S" -OutFile $startupDest
+
+    Write-Host "[OK] Board support and official GCC startup/linker files downloaded"
     Write-Host ""
 
     # 3. Fetch CMSIS Core headers (standard ARM CMSIS-Core include files)
