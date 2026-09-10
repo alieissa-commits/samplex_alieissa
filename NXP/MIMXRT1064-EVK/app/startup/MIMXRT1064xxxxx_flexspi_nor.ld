@@ -255,7 +255,7 @@ SECTIONS
     . += HEAP_SIZE;
     __HeapLimit = .;
     __heap_limit = .; /* Add for _sbrk */
-    __RAM_segment_used_end__ = .; /* Used by ThreadX for first unused memory */
+    __RAM_segment_used_end__ = .;
   } > m_data
 
   .stack :
@@ -268,7 +268,6 @@ SECTIONS
   __StackTop   = ORIGIN(m_data) + LENGTH(m_data);
   __StackLimit = __StackTop - STACK_SIZE;
   PROVIDE(__stack = __StackTop);
-  PROVIDE(_estack = __StackTop);
 
   .ARM.attributes 0 : { *(.ARM.attributes) }
 

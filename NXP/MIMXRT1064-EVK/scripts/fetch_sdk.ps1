@@ -163,19 +163,16 @@ try {
         Download-WithRetry -Uri $item.Remote -OutFile $dest
     }
 
-    # Download official GNU GCC Linker Script & Startup File from official NXP mcux-sdk repository
-    Write-Host "[INFO] Downloading official NXP GNU GCC Linker Script and Startup File..."
+    # Download official GNU GCC Linker Script & Startup File for reference in lib/mcux-sdk/board/
+    Write-Host "[INFO] Downloading official NXP GNU GCC Linker Script and Startup File into board directory..."
     $nxpGccBase = "https://raw.githubusercontent.com/nxp-mcuxpresso/mcux-sdk/main/devices/MIMXRT1064/gcc"
     $ldDestBoard = Join-Path $BoardFilesDir "MIMXRT1064xxxxx_flexspi_nor.ld"
-    $ldDestApp = Join-Path $AppStartupDir "MIMXRT1064xxxxx_flexspi_nor.ld"
-    $startupDest = Join-Path $AppStartupDir "startup_mimxrt1064.S"
+    $startupDestBoard = Join-Path $BoardFilesDir "startup_MIMXRT1064.S"
 
     Download-WithRetry -Uri "$nxpGccBase/MIMXRT1064xxxxx_flexspi_nor.ld" -OutFile $ldDestBoard
-    Copy-Item -Path $ldDestBoard -Destination $ldDestApp -Force
+    Download-WithRetry -Uri "$nxpGccBase/startup_MIMXRT1064.S" -OutFile $startupDestBoard
 
-    Download-WithRetry -Uri "$nxpGccBase/startup_MIMXRT1064.S" -OutFile $startupDest
-
-    Write-Host "[OK] Board support and official GCC startup/linker files downloaded"
+    Write-Host "[OK] Board support and official GCC reference files downloaded"
     Write-Host ""
 
     # 3. Fetch CMSIS Core headers (standard ARM CMSIS-Core include files)
