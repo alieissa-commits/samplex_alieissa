@@ -113,14 +113,12 @@ curl -fsSL "${RAW_BASE}/dcd.h" -o "${BOARD_FILES_DIR}/dcd.h"
 curl -fsSL "${RAW_BASE}/xip/evkmimxrt1064_flexspi_nor_config.c" -o "${BOARD_FILES_DIR}/evkmimxrt1064_flexspi_nor_config.c"
 curl -fsSL "${RAW_BASE}/xip/evkmimxrt1064_flexspi_nor_config.h" -o "${BOARD_FILES_DIR}/evkmimxrt1064_flexspi_nor_config.h"
 
-echo "[INFO] Downloading official NXP GNU GCC Linker Script and Startup File..."
+echo "[INFO] Downloading official NXP GNU GCC Linker Script and Startup File into board directory..."
 NXP_GCC_BASE="https://raw.githubusercontent.com/nxp-mcuxpresso/mcux-sdk/main/devices/MIMXRT1064/gcc"
 curl --retry 3 -fsSL "${NXP_GCC_BASE}/MIMXRT1064xxxxx_flexspi_nor.ld" -o "${BOARD_FILES_DIR}/MIMXRT1064xxxxx_flexspi_nor.ld"
-cp "${BOARD_FILES_DIR}/MIMXRT1064xxxxx_flexspi_nor.ld" "${APP_STARTUP_DIR}/MIMXRT1064xxxxx_flexspi_nor.ld"
+curl --retry 3 -fsSL "${NXP_GCC_BASE}/startup_MIMXRT1064.S" -o "${BOARD_FILES_DIR}/startup_MIMXRT1064.S"
 
-curl --retry 3 -fsSL "${NXP_GCC_BASE}/startup_MIMXRT1064.S" -o "${APP_STARTUP_DIR}/startup_mimxrt1064.S"
-
-echo "[OK] Board support and official GCC startup/linker files downloaded"
+echo "[OK] Board support and official GCC reference files downloaded"
 echo ""
 
 # 3. Fetch CMSIS Core headers

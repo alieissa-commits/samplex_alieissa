@@ -19,14 +19,14 @@
     .section .isr_vector, "a"
     .align 2
     .globl __isr_vector
-    .globl __VECTOR_TABLE
-    .globl __Vectors
     .globl _vectors
+    .globl __Vectors
+    .globl __VECTOR_TABLE
     .globl g_pfnVectors
 __isr_vector:
-__VECTOR_TABLE:
-__Vectors:
 _vectors:
+__Vectors:
+__VECTOR_TABLE:
 g_pfnVectors:
     .long   __StackTop                                      /* Top of Stack */
     .long   Reset_Handler                                   /* Reset Handler */
@@ -405,10 +405,6 @@ Reset_Handler:
     strlt   r0,[r2],#4
     blt    .LC4
 #endif /* __STARTUP_INITIALIZE_NONCACHEDATA */
-
-#ifndef __STARTUP_CLEAR_BSS
-#define __STARTUP_CLEAR_BSS
-#endif
 
 #ifdef __STARTUP_CLEAR_BSS
 /*     This part of work usually is done in C library startup code. Otherwise,
