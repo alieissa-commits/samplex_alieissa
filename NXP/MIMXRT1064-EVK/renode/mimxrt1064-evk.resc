@@ -1,0 +1,21 @@
+:name: MIMXRT1064-EVK ThreadX Demo
+:description: This script runs the Eclipse ThreadX demo on NXP i.MX RT1064-EVK.
+
+mach create "mimxrt1064-evk"
+machine LoadPlatformDescription @platforms/boards/mimxrt1064_evk.repl
+
+$bin?=@$ORIGIN/../build/mimxrt1064_threadx.elf
+
+showAnalyzer sysbus.lpuart1
+
+macro reset
+"""
+    cpu VectorTableOffset 0x70002000
+    sysbus LoadELF $bin
+    cpu PC `sysbus ReadDoubleWord 0x70002004`
+    cpu SP `sysbus ReadDoubleWord 0x70002000`
+"""
+
+runMacro $reset
+
+start

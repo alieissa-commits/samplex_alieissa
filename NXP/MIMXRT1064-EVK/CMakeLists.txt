@@ -82,3 +82,55 @@ target_include_directories(${SDK_TARGET}
 # Compile ThreadX Kernel from root shared libs submodule
 set(THREADX_DIR "${CMAKE_CURRENT_LIST_DIR}/../../libs/threadx")
 add_subdirectory(${THREADX_DIR} threadx)
+
+# Create the Main Executable
+set(EXE_TARGET mimxrt1064_threadx)
+
+add_executable(${EXE_TARGET}
+    app/startup/startup_mimxrt1064.S
+    app/startup/tx_initialize_low_level.S
+    app/board_init.c
+    app/console.c
+    app/main.c
+    app/sysmem.c
+    app/syscalls.c
+)
+
+# Set compile definitions for our executable
+target_compile_definitions(${EXE_TARGET}
+    PRIVATE
+        CPU_MIMXRT1064DVL6A
+        XIP_EXTERNAL_FLASH=1
+        XIP_BOOT_HEADER_ENABLE=1
+        XIP_BOOT_HEADER_DCD_ENABLE=1
+        FSL_SDK_DRIVER_QUICK_ACCESS_ENABLE=1
+        SDK_DEBUGCONSOLE=1
+        SKIP_SYSCLK_INIT=1
+)
+
+# Include paths
+target_include_directories(${EXE_TARGET}
+    PRIVATE
+        ${CMAKE_CURRENT_LIST_DIR}/app
+        ${SDK_DIR}/CMSIS/Include
+        ${SDK_DIR}/devices/MIMXRT1064
+        ${SDK_DIR}/drivers
+        ${SDK_DIR}/board
+        ${SDK_DIR}/utilities
+        ${SDK_DIR}/components/uart
+        ${TX_USER_FILE_DIR}
+)
+
+# Link libraries (includes ThreadX kernel and MCUXpresso SDK object libraries)
+target_link_libraries(${EXE_TARGET}
+    PRIVATE
+        threadx
+        mcux_sdk
+)
+
+# Apply GCC linker script and print memory usage (utilities.cmake function)
+set_target_linker(${EXE_TARGET} "${CMAKE_CURRENT_LIST_DIR}/app/startup/MIMXRT1064xxxxx_flexspi_nor.ld")
+
+# Post-build commands to generate raw .bin and .hex files
+post_build(${EXE_TARGET})
+
