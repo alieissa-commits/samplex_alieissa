@@ -24,6 +24,9 @@ user_button: Miscellaneous.Button @ gpio5
     -> gpio5@0
 
 // User LED D18 (Green, active low, connected to GPIO1 Pin 9)
+gpio1:
+    9 -> user_led@0
+
 user_led: Miscellaneous.LED @ gpio1 9
     invert: true
 
