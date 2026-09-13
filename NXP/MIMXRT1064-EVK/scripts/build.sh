@@ -19,12 +19,14 @@ NUM_JOBS=4
 
 CLEAN=0
 REBUILD=0
+DEMO="netx_echo"
 
 # Parse arguments
 while [[ "$#" -gt 0 ]]; do
     case $1 in
         --clean) CLEAN=1 ;;
         --rebuild) REBUILD=1 ;;
+        --demo) DEMO="$2"; shift ;;
         *) echo "Unknown parameter passed: $1"; exit 1 ;;
     esac
     shift
@@ -33,8 +35,9 @@ done
 echo "=========================================="
 echo "NXP MIMXRT1064-EVK - Build Script (POSIX)"
 echo "=========================================="
-echo "Board Dir: ${BOARD_DIR}"
-echo "Build Dir: ${BUILD_DIR}"
+echo "Board Dir:   ${BOARD_DIR}"
+echo "Build Dir:   ${BUILD_DIR}"
+echo "Active Demo: ${DEMO}"
 echo ""
 
 # Check for ARM GCC compiler
@@ -54,24 +57,38 @@ fi
 mkdir -p "${BUILD_DIR}"
 cd "${BUILD_DIR}"
 
-# Reconfigure if CMakeCache.txt or build.ninja is missing, or if forced
+# Reconfigure if CMakeCache.txt or build.ninja is missing, or demo changed, or if forced
+NEED_CONFIG=0
 if [ ! -f "CMakeCache.txt" ] || [ ! -f "build.ninja" ] || [ "${REBUILD}" -eq 1 ]; then
-    echo "[INFO] Configuring CMake..."
+    NEED_CONFIG=1
+else
+    CACHED_DEMO=$(grep "^ACTIVE_DEMO:STRING=" CMakeCache.txt 2>/dev/null | cut -d'=' -f2 | tr -d '[:space:]')
+    if [ "${CACHED_DEMO}" != "${DEMO}" ]; then
+        NEED_CONFIG=1
+    fi
+fi
+
+if [ "${NEED_CONFIG}" -eq 1 ]; then
+    echo "[INFO] Configuring CMake for demo: ${DEMO}..."
     cmake -G Ninja \
-        -DCMAKE_BUILD_TYPE=Release \
+        "-DCMAKE_BUILD_TYPE=Release" \
+        "-DACTIVE_DEMO=${DEMO}" \
         ..
     echo "[OK] CMake configured"
     echo ""
 fi
 
-echo "[INFO] Building with ${NUM_JOBS} parallel jobs..."
-if command -v ninja &> /dev/null; then
-    ninja -j "${NUM_JOBS}"
-else
-    cmake --build . --parallel "${NUM_JOBS}" --config Release
-fi
+# Run build using Ninja
+echo "[INFO] Building target with Ninja (${NUM_JOBS} parallel jobs)..."
+ninja -j ${NUM_JOBS}
 
 echo ""
-echo "=========================================="
-echo "[OK] Build completed successfully!"
-echo "=========================================="
+echo "[SUCCESS] Build finished successfully!"
+echo "Server Firmware ELF: ${BUILD_DIR}/mimxrt1064_threadx.elf"
+echo "Server Firmware BIN: ${BUILD_DIR}/mimxrt1064_threadx.bin"
+echo "Server Firmware HEX: ${BUILD_DIR}/mimxrt1064_threadx.hex"
+if [ -f "${BUILD_DIR}/mimxrt1064_client.elf" ]; then
+    echo "Client Firmware ELF: ${BUILD_DIR}/mimxrt1064_client.elf"
+    echo "Client Firmware BIN: ${BUILD_DIR}/mimxrt1064_client.bin"
+    echo "Client Firmware HEX: ${BUILD_DIR}/mimxrt1064_client.hex"
+fi

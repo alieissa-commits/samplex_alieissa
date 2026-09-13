@@ -8,7 +8,7 @@
  * SPDX-License-Identifier: MIT
  *
  * Contributors:
- *    Ali Eissa - 2026 NXP i.MX RT1064 port.
+ *    Ali Eissa - 2026 version.
  */
 
 #include <errno.h>

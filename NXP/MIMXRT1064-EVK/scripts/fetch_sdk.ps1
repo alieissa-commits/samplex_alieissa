@@ -132,6 +132,12 @@ try {
         param([string]$Uri, [string]$OutFile, [int]$MaxAttempts = 4)
         for ($i = 1; $i -le $MaxAttempts; $i++) {
             try {
+                if (Get-Command curl.exe -ErrorAction SilentlyContinue) {
+                    & curl.exe --retry 3 --retry-delay 2 -fsSL $Uri -o $OutFile
+                    if ($LASTEXITCODE -eq 0 -and (Test-Path $OutFile) -and ((Get-Item $OutFile).Length -gt 0)) {
+                        return
+                    }
+                }
                 Invoke-WebRequest -Uri $Uri -OutFile $OutFile -UseBasicParsing -TimeoutSec 30
                 return
             }
@@ -163,16 +169,18 @@ try {
         Download-WithRetry -Uri $item.Remote -OutFile $dest
     }
 
-    # Download official GNU GCC Linker Script & Startup File for reference in lib/mcux-sdk/board/
-    Write-Host "[INFO] Downloading official NXP GNU GCC Linker Script and Startup File into board directory..."
-    $nxpGccBase = "https://raw.githubusercontent.com/nxp-mcuxpresso/mcux-sdk/main/devices/MIMXRT1064/gcc"
-    $ldDestBoard = Join-Path $BoardFilesDir "MIMXRT1064xxxxx_flexspi_nor.ld"
-    $startupDestBoard = Join-Path $BoardFilesDir "startup_MIMXRT1064.S"
-
-    Download-WithRetry -Uri "$nxpGccBase/MIMXRT1064xxxxx_flexspi_nor.ld" -OutFile $ldDestBoard
-    Download-WithRetry -Uri "$nxpGccBase/startup_MIMXRT1064.S" -OutFile $startupDestBoard
-
-    Write-Host "[OK] Board support and official GCC reference files downloaded"
+    # Copy official GNU GCC Linker Script & Startup File from DFP pack into board directory
+    Write-Host "[INFO] Copying official NXP GNU GCC Linker Script and Startup File into board directory..."
+    $gccSource = Join-Path $packExtract "gcc"
+    if (Test-Path $gccSource) {
+        if (Test-Path "$gccSource/MIMXRT1064xxxxx_flexspi_nor.ld") {
+            Copy-Item -Path "$gccSource/MIMXRT1064xxxxx_flexspi_nor.ld" -Destination $BoardFilesDir -Force
+        }
+        if (Test-Path "$gccSource/startup_MIMXRT1064.S") {
+            Copy-Item -Path "$gccSource/startup_MIMXRT1064.S" -Destination $BoardFilesDir -Force
+        }
+    }
+    Write-Host "[OK] Board support and official GCC reference files copied"
     Write-Host ""
 
     # 3. Fetch CMSIS Core headers (standard ARM CMSIS-Core include files)
@@ -184,6 +192,28 @@ try {
     }
     Copy-Item -Path "$cmsisCloneDir/CMSIS/Core/Include/*" -Destination $CmsisIncludeDest -Recurse -Force
     Write-Host "[OK] CMSIS Core headers copied"
+    Write-Host ""
+
+    # 4. Fetch official NXP KSZ8081 PHY driver (100% stock upstream)
+    Write-Host "[INFO] Downloading official KSZ8081 PHY driver..."
+    $phyRawBase = "https://raw.githubusercontent.com/eclipse-threadx/getting-started/master/NXP/MIMXRT1060-EVK/lib/MIMXRT1060-evk/src/components/phyksz8081"
+    $phyDestDir = Join-Path $ComponentsDir "phy"
+    New-Item -ItemType Directory -Path $phyDestDir -Force | Out-Null
+    Download-WithRetry -Uri "$phyRawBase/fsl_phy.c" -OutFile (Join-Path $phyDestDir "fsl_phy.c")
+    Download-WithRetry -Uri "$phyRawBase/fsl_phy.h" -OutFile (Join-Path $phyDestDir "fsl_phy.h")
+    Write-Host "[OK] Stock KSZ8081 PHY driver downloaded"
+    Write-Host ""
+
+    # 5. Fetch official NetX Duo NXP Ethernet driver (100% stock upstream)
+    Write-Host "[INFO] Downloading official NetX Duo NXP Ethernet driver..."
+    $netxRawBase = "https://raw.githubusercontent.com/eclipse-threadx/getting-started/master/NXP/MIMXRT1060-EVK/lib/netx_driver"
+    $netxDriverDestDir = Join-Path $DriversDir "netx_driver"
+    $netxDriverGnuDir = Join-Path $netxDriverDestDir "gnu"
+    New-Item -ItemType Directory -Path $netxDriverGnuDir -Force | Out-Null
+    Download-WithRetry -Uri "$netxRawBase/src/nx_driver_imxrt1062.c" -OutFile (Join-Path $netxDriverDestDir "nx_driver_imxrt1062.c")
+    Download-WithRetry -Uri "$netxRawBase/src/nx_driver_imxrt1062.h" -OutFile (Join-Path $netxDriverDestDir "nx_driver_imxrt1062.h")
+    Download-WithRetry -Uri "$netxRawBase/src/gnu/nx_driver_imxrt1062_low_level.S" -OutFile (Join-Path $netxDriverGnuDir "nx_driver_imxrt1062_low_level.S")
+    Write-Host "[OK] Stock NetX Duo NXP Ethernet driver downloaded"
     Write-Host ""
 
     Write-Host "=========================================="

@@ -11,7 +11,8 @@
 
 param(
     [switch]$Clean,
-    [switch]$Rebuild
+    [switch]$Rebuild,
+    [string]$Demo = "netx_echo"
 )
 
 $BoardDir = Resolve-Path "$PSScriptRoot/.."
@@ -21,8 +22,9 @@ $NUM_JOBS = 4
 Write-Host "=========================================="
 Write-Host "NXP MIMXRT1064-EVK - Build Script"
 Write-Host "=========================================="
-Write-Host "Board Dir: $BoardDir"
-Write-Host "Build Dir: $BUILD_DIR"
+Write-Host "Board Dir:   $BoardDir"
+Write-Host "Build Dir:   $BUILD_DIR"
+Write-Host "Active Demo: $Demo"
 Write-Host ""
 
 # Check for ARM GCC compiler
@@ -48,11 +50,20 @@ if (!(Test-Path $BUILD_DIR)) {
 
 Push-Location $BUILD_DIR
 
-# Reconfigure if CMakeCache.txt or build.ninja is missing, or if forced
-if (!(Test-Path "CMakeCache.txt") -or !(Test-Path "build.ninja") -or $Rebuild) {
-    Write-Host "[INFO] Configuring CMake..."
+# Reconfigure if CMakeCache.txt or build.ninja is missing, or demo changed, or if forced
+$needConfig = !(Test-Path "CMakeCache.txt") -or !(Test-Path "build.ninja") -or $Rebuild
+if (!$needConfig -and (Test-Path "CMakeCache.txt")) {
+    $cachedDemo = (Select-String -Path "CMakeCache.txt" -Pattern "^ACTIVE_DEMO:STRING=(.*)$" | ForEach-Object { $_.Matches.Groups[1].Value.Trim() })
+    if ($cachedDemo -ne $Demo) {
+        $needConfig = $true
+    }
+}
+
+if ($needConfig) {
+    Write-Host "[INFO] Configuring CMake for demo: $Demo..."
     cmake -G Ninja `
         "-DCMAKE_BUILD_TYPE=Release" `
+        "-DACTIVE_DEMO=$Demo" `
         ..
     if ($LASTEXITCODE -ne 0) {
         Write-Host "[ERROR] CMake configuration failed!" -ForegroundColor Red
@@ -63,22 +74,24 @@ if (!(Test-Path "CMakeCache.txt") -or !(Test-Path "build.ninja") -or $Rebuild) {
     Write-Host ""
 }
 
-Write-Host "[INFO] Building with $NUM_JOBS parallel jobs..."
-if (Get-Command ninja -ErrorAction SilentlyContinue) {
-    ninja -j $NUM_JOBS
-} else {
-    cmake --build . --parallel $NUM_JOBS --config Release
-}
-
-$buildExitCode = $LASTEXITCODE
-Pop-Location
-
-if ($buildExitCode -ne 0) {
+# Run build using Ninja
+Write-Host "[INFO] Building target with Ninja ($NUM_JOBS parallel jobs)..."
+ninja -j $NUM_JOBS
+if ($LASTEXITCODE -ne 0) {
     Write-Host "[ERROR] Build failed!" -ForegroundColor Red
+    Pop-Location
     exit 1
 }
 
 Write-Host ""
-Write-Host "=========================================="
-Write-Host "[OK] Build completed successfully!"
-Write-Host "=========================================="
+Write-Host "[SUCCESS] Build finished successfully!" -ForegroundColor Green
+Write-Host "Server Firmware ELF: $(Join-Path $BUILD_DIR 'mimxrt1064_threadx.elf')"
+Write-Host "Server Firmware BIN: $(Join-Path $BUILD_DIR 'mimxrt1064_threadx.bin')"
+Write-Host "Server Firmware HEX: $(Join-Path $BUILD_DIR 'mimxrt1064_threadx.hex')"
+if (Test-Path (Join-Path $BUILD_DIR 'mimxrt1064_client.elf')) {
+    Write-Host "Client Firmware ELF: $(Join-Path $BUILD_DIR 'mimxrt1064_client.elf')"
+    Write-Host "Client Firmware BIN: $(Join-Path $BUILD_DIR 'mimxrt1064_client.bin')"
+    Write-Host "Client Firmware HEX: $(Join-Path $BUILD_DIR 'mimxrt1064_client.hex')"
+}
+
+Pop-Location

@@ -36,3 +36,14 @@ adc1:
 
 adc2:
     referenceVoltage: 3.3
+
+// Ethernet Physical Layer (KSZ8081 PHY at address 2 on enet)
+phy: Network.EthernetPhysicalLayer @ enet 2
+    Id1: 0x0022
+    Id2: 0x1560
+    BasicControl: 0x3100
+    BasicStatus: 0x782D
+    AutoNegotiationAdvertisement: 0x01E1
+    AutoNegotiationLinkPartnerBasePageAbility: 0x01E1
+    VendorSpecific14: 0x0116
+    VendorSpecific15: 0x0080
