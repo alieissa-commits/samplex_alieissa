@@ -113,12 +113,16 @@ curl -fsSL "${RAW_BASE}/dcd.h" -o "${BOARD_FILES_DIR}/dcd.h"
 curl -fsSL "${RAW_BASE}/xip/evkmimxrt1064_flexspi_nor_config.c" -o "${BOARD_FILES_DIR}/evkmimxrt1064_flexspi_nor_config.c"
 curl -fsSL "${RAW_BASE}/xip/evkmimxrt1064_flexspi_nor_config.h" -o "${BOARD_FILES_DIR}/evkmimxrt1064_flexspi_nor_config.h"
 
-echo "[INFO] Downloading official NXP GNU GCC Linker Script and Startup File into board directory..."
-NXP_GCC_BASE="https://raw.githubusercontent.com/nxp-mcuxpresso/mcux-sdk/main/devices/MIMXRT1064/gcc"
-curl --retry 3 -fsSL "${NXP_GCC_BASE}/MIMXRT1064xxxxx_flexspi_nor.ld" -o "${BOARD_FILES_DIR}/MIMXRT1064xxxxx_flexspi_nor.ld"
-curl --retry 3 -fsSL "${NXP_GCC_BASE}/startup_MIMXRT1064.S" -o "${BOARD_FILES_DIR}/startup_MIMXRT1064.S"
-
-echo "[OK] Board support and official GCC reference files downloaded"
+echo "[INFO] Copying official NXP GNU GCC Linker Script and Startup File into board directory..."
+if [ -d "${PACK_EXTRACT}/gcc" ]; then
+    if [ -f "${PACK_EXTRACT}/gcc/MIMXRT1064xxxxx_flexspi_nor.ld" ]; then
+        cp "${PACK_EXTRACT}/gcc/MIMXRT1064xxxxx_flexspi_nor.ld" "${BOARD_FILES_DIR}/"
+    fi
+    if [ -f "${PACK_EXTRACT}/gcc/startup_MIMXRT1064.S" ]; then
+        cp "${PACK_EXTRACT}/gcc/startup_MIMXRT1064.S" "${BOARD_FILES_DIR}/"
+    fi
+fi
+echo "[OK] Board support and official GCC reference files copied"
 echo ""
 
 # 3. Fetch CMSIS Core headers
@@ -127,6 +131,26 @@ CMSIS_CLONE_DIR="${TEMP_DIR}/cmsis_core_repo"
 git clone --depth 1 https://github.com/STMicroelectronics/cmsis-core.git "${CMSIS_CLONE_DIR}"
 cp -r "${CMSIS_CLONE_DIR}/CMSIS/Core/Include/"* "${CMSIS_INCLUDE_DEST}/"
 echo "[OK] CMSIS Core headers copied"
+echo ""
+
+# 4. Fetch official NXP KSZ8081 PHY driver (100% stock upstream)
+echo "[INFO] Downloading official KSZ8081 PHY driver..."
+PHY_RAW_BASE="https://raw.githubusercontent.com/eclipse-threadx/getting-started/master/NXP/MIMXRT1060-EVK/lib/MIMXRT1060-evk/src/components/phyksz8081"
+mkdir -p "${COMPONENTS_DIR}/phy"
+curl --retry 3 -fsSL "${PHY_RAW_BASE}/fsl_phy.c" -o "${COMPONENTS_DIR}/phy/fsl_phy.c"
+curl --retry 3 -fsSL "${PHY_RAW_BASE}/fsl_phy.h" -o "${COMPONENTS_DIR}/phy/fsl_phy.h"
+echo "[OK] Stock KSZ8081 PHY driver downloaded"
+echo ""
+
+# 5. Fetch official NetX Duo NXP Ethernet driver (100% stock upstream)
+echo "[INFO] Downloading official NetX Duo NXP Ethernet driver..."
+NETX_RAW_BASE="https://raw.githubusercontent.com/eclipse-threadx/getting-started/master/NXP/MIMXRT1060-EVK/lib/netx_driver"
+NETX_DIR="${DRIVERS_DIR}/netx_driver"
+mkdir -p "${NETX_DIR}/gnu"
+curl --retry 3 -fsSL "${NETX_RAW_BASE}/src/nx_driver_imxrt1062.c" -o "${NETX_DIR}/nx_driver_imxrt1062.c"
+curl --retry 3 -fsSL "${NETX_RAW_BASE}/src/nx_driver_imxrt1062.h" -o "${NETX_DIR}/nx_driver_imxrt1062.h"
+curl --retry 3 -fsSL "${NETX_RAW_BASE}/src/gnu/nx_driver_imxrt1062_low_level.S" -o "${NETX_DIR}/gnu/nx_driver_imxrt1062_low_level.S"
+echo "[OK] Stock NetX Duo NXP Ethernet driver downloaded"
 echo ""
 
 echo "=========================================="

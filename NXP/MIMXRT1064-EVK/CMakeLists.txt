@@ -9,8 +9,9 @@
 #  Contributors: 
 #     Ali Eissa - 2026 version.
 
-cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.10 FATAL_ERROR)
 set(CMAKE_C_STANDARD 99)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Set the toolchain if not defined
 if(NOT CMAKE_TOOLCHAIN_FILE)
@@ -24,14 +25,45 @@ include(utilities)
 # Define the Project
 project(mimxrt1064_threadx C CXX ASM)
 
-# Define ThreadX User Configurations
-set(TX_USER_FILE "${CMAKE_CURRENT_LIST_DIR}/lib/threadx/tx_user.h" CACHE STRING "Enable TX user configuration")
-set(TX_USER_FILE_DIR "${CMAKE_CURRENT_LIST_DIR}/lib/threadx")
+# Ensure executable output (elf, bin, hex) goes directly to the top-level build directory
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
+
+# Select the active demo to build (default: netx_echo, or threadx_basic)
+set(ACTIVE_DEMO "netx_echo" CACHE STRING "Active demo name to build: netx_echo, threadx_basic")
 
 # Set up paths for MCUXpresso SDK
 set(SDK_DIR "${CMAKE_CURRENT_LIST_DIR}/lib/mcux-sdk")
 if(NOT EXISTS "${SDK_DIR}/devices/MIMXRT1064/MIMXRT1064.h")
     message(FATAL_ERROR "NXP SDK dependencies missing! Please run 'scripts/fetch_sdk.ps1' or 'scripts/fetch_sdk.sh' first.")
+endif()
+
+# Dynamic Middleware Auto-Detection
+# Check if the active demo uses NetX Duo by looking for nx_user.h
+if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/app/demos/${ACTIVE_DEMO}/nx_user.h")
+    set(USE_NETXDUO ON)
+    set(NX_USER_FILE "${CMAKE_CURRENT_LIST_DIR}/app/demos/${ACTIVE_DEMO}/nx_user.h" CACHE STRING "Enable NetX Duo user configuration" FORCE)
+else()
+    set(USE_NETXDUO OFF)
+endif()
+
+# Check if the active demo has custom tx_user.h; otherwise fallback to lib/threadx/tx_user.h
+if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/app/demos/${ACTIVE_DEMO}/tx_user.h")
+    set(TX_USER_FILE "${CMAKE_CURRENT_LIST_DIR}/app/demos/${ACTIVE_DEMO}/tx_user.h" CACHE STRING "Enable TX user configuration" FORCE)
+    set(TX_USER_FILE_DIR "${CMAKE_CURRENT_LIST_DIR}/app/demos/${ACTIVE_DEMO}")
+else()
+    set(TX_USER_FILE "${CMAKE_CURRENT_LIST_DIR}/lib/threadx/tx_user.h" CACHE STRING "Enable TX user configuration" FORCE)
+    set(TX_USER_FILE_DIR "${CMAKE_CURRENT_LIST_DIR}/lib/threadx")
+endif()
+
+# Compile ThreadX Kernel from root shared libs submodule
+set(THREADX_DIR "${CMAKE_CURRENT_LIST_DIR}/../../libs/threadx")
+add_subdirectory(${THREADX_DIR} threadx)
+
+if(USE_NETXDUO)
+    # Compile NetX Duo TCP/IP Stack from root shared libs submodule
+    set(NXD_ENABLE_FILE_SERVERS OFF CACHE BOOL "Disable FileX dependency in NetX Duo" FORCE)
+    set(NETXDUO_DIR "${CMAKE_CURRENT_LIST_DIR}/../../libs/netxduo")
+    add_subdirectory(${NETXDUO_DIR} netxduo)
 endif()
 
 # Compile the NXP MCUXpresso Driver & Board Library as an Object Library
@@ -65,6 +97,7 @@ target_compile_definitions(${SDK_TARGET}
         FSL_SDK_DRIVER_QUICK_ACCESS_ENABLE=1
         SDK_DEBUGCONSOLE=1
         SKIP_SYSCLK_INIT=1
+        __STARTUP_INITIALIZE_NONCACHEDATA=1
 )
 
 target_include_directories(${SDK_TARGET}
@@ -79,26 +112,18 @@ target_include_directories(${SDK_TARGET}
         ${TX_USER_FILE_DIR}
 )
 
-# Compile ThreadX Kernel from root shared libs submodule
-set(THREADX_DIR "${CMAKE_CURRENT_LIST_DIR}/../../libs/threadx")
-add_subdirectory(${THREADX_DIR} threadx)
-
-# Create the Main Executable
-set(EXE_TARGET mimxrt1064_threadx)
-
-add_executable(${EXE_TARGET}
+# 1. Define Board BSP object library
+add_library(board_bsp OBJECT
     app/startup/startup_mimxrt1064.S
     app/startup/tx_initialize_low_level.S
     app/board_init.c
     app/console.c
-    app/main.c
     app/sysmem.c
     app/syscalls.c
 )
 
-# Set compile definitions for our executable
-target_compile_definitions(${EXE_TARGET}
-    PRIVATE
+target_compile_definitions(board_bsp
+    PUBLIC
         CPU_MIMXRT1064DVL6A
         XIP_EXTERNAL_FLASH=1
         XIP_BOOT_HEADER_ENABLE=1
@@ -106,11 +131,11 @@ target_compile_definitions(${EXE_TARGET}
         FSL_SDK_DRIVER_QUICK_ACCESS_ENABLE=1
         SDK_DEBUGCONSOLE=1
         SKIP_SYSCLK_INIT=1
+        __STARTUP_INITIALIZE_NONCACHEDATA=1
 )
 
-# Include paths
-target_include_directories(${EXE_TARGET}
-    PRIVATE
+target_include_directories(board_bsp
+    PUBLIC
         ${CMAKE_CURRENT_LIST_DIR}/app
         ${SDK_DIR}/CMSIS/Include
         ${SDK_DIR}/devices/MIMXRT1064
@@ -121,16 +146,99 @@ target_include_directories(${EXE_TARGET}
         ${TX_USER_FILE_DIR}
 )
 
-# Link libraries (includes ThreadX kernel and MCUXpresso SDK object libraries)
-target_link_libraries(${EXE_TARGET}
-    PRIVATE
-        threadx
+target_link_libraries(board_bsp
+    PUBLIC
         mcux_sdk
+        threadx
 )
 
-# Apply GCC linker script and print memory usage (utilities.cmake function)
-set_target_linker(${EXE_TARGET} "${CMAKE_CURRENT_LIST_DIR}/app/startup/MIMXRT1064xxxxx_flexspi_nor.ld")
+# 2. Define conditional NetX Duo driver library target
+if(USE_NETXDUO)
+    add_library(netx_imxrt_driver OBJECT
+        ${SDK_DIR}/drivers/netx_driver/nx_driver_imxrt1062.c
+        ${SDK_DIR}/drivers/netx_driver/gnu/nx_driver_imxrt1062_low_level.S
+        ${SDK_DIR}/components/phy/fsl_phy.c
+        ${SDK_DIR}/drivers/fsl_enet.c
+    )
 
-# Post-build commands to generate raw .bin and .hex files
-post_build(${EXE_TARGET})
+    target_compile_definitions(netx_imxrt_driver
+        PUBLIC
+            CPU_MIMXRT1064DVL6A
+            XIP_EXTERNAL_FLASH=1
+            XIP_BOOT_HEADER_ENABLE=1
+            XIP_BOOT_HEADER_DCD_ENABLE=1
+            FSL_SDK_DRIVER_QUICK_ACCESS_ENABLE=1
+            SDK_DEBUGCONSOLE=1
+            SKIP_SYSCLK_INIT=1
+            __STARTUP_INITIALIZE_NONCACHEDATA=1
+    )
 
+    target_include_directories(netx_imxrt_driver
+        PUBLIC
+            ${SDK_DIR}/drivers/netx_driver
+            ${SDK_DIR}/components/phy
+            ${CMAKE_CURRENT_LIST_DIR}/app
+            ${CMAKE_CURRENT_LIST_DIR}/app/demos/${ACTIVE_DEMO}
+            ${SDK_DIR}/CMSIS/Include
+            ${SDK_DIR}/devices/MIMXRT1064
+            ${SDK_DIR}/drivers
+            ${SDK_DIR}/board
+            ${SDK_DIR}/utilities
+            ${SDK_DIR}/components/uart
+            ${TX_USER_FILE_DIR}
+    )
+
+    target_link_libraries(netx_imxrt_driver
+        PUBLIC
+            netxduo
+            threadx
+            mcux_sdk
+    )
+    target_compile_options(netx_imxrt_driver PRIVATE -Wno-unused-variable)
+
+    add_library(netx_imxrt_driver_client OBJECT
+        ${SDK_DIR}/drivers/netx_driver/nx_driver_imxrt1062.c
+        ${SDK_DIR}/drivers/netx_driver/gnu/nx_driver_imxrt1062_low_level.S
+        ${SDK_DIR}/components/phy/fsl_phy.c
+        ${SDK_DIR}/drivers/fsl_enet.c
+    )
+
+    target_compile_definitions(netx_imxrt_driver_client
+        PUBLIC
+            NETX_CLIENT_NODE=1
+            CPU_MIMXRT1064DVL6A
+            XIP_EXTERNAL_FLASH=1
+            XIP_BOOT_HEADER_ENABLE=1
+            XIP_BOOT_HEADER_DCD_ENABLE=1
+            FSL_SDK_DRIVER_QUICK_ACCESS_ENABLE=1
+            SDK_DEBUGCONSOLE=1
+            SKIP_SYSCLK_INIT=1
+            __STARTUP_INITIALIZE_NONCACHEDATA=1
+    )
+
+    target_include_directories(netx_imxrt_driver_client
+        PUBLIC
+            ${SDK_DIR}/drivers/netx_driver
+            ${SDK_DIR}/components/phy
+            ${CMAKE_CURRENT_LIST_DIR}/app
+            ${CMAKE_CURRENT_LIST_DIR}/app/demos/${ACTIVE_DEMO}
+            ${SDK_DIR}/CMSIS/Include
+            ${SDK_DIR}/devices/MIMXRT1064
+            ${SDK_DIR}/drivers
+            ${SDK_DIR}/board
+            ${SDK_DIR}/utilities
+            ${SDK_DIR}/components/uart
+            ${TX_USER_FILE_DIR}
+    )
+
+    target_link_libraries(netx_imxrt_driver_client
+        PUBLIC
+            netxduo
+            threadx
+            mcux_sdk
+    )
+    target_compile_options(netx_imxrt_driver_client PRIVATE -Wno-unused-variable)
+endif()
+
+# 3. Add the active demo subdirectory to build the executable target
+add_subdirectory(app/demos/${ACTIVE_DEMO})

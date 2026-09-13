@@ -9,15 +9,31 @@
 #  Contributors: 
 #     Ali Eissa - 2026 version.
 
-$BoardDir = Resolve-Path "$PSScriptRoot/.."
-$ElfPath = Join-Path $BoardDir "build/mimxrt1064_threadx.elf"
-$RescRelPath = "renode/mimxrt1064-evk.resc"
-$RescFullPath = Join-Path $BoardDir $RescRelPath
+param(
+    [string]$Resc
+)
 
-if (-not (Test-Path $ElfPath)) {
-    Write-Error "Binary $ElfPath not found. Please build the project first using .\scripts\build.ps1"
+$BoardDir = Resolve-Path "$PSScriptRoot/.."
+$ServerElf = Join-Path $BoardDir "build/mimxrt1064_threadx.elf"
+$ClientElf = Join-Path $BoardDir "build/mimxrt1064_client.elf"
+
+if (-not (Test-Path $ServerElf)) {
+    Write-Error "Binary $ServerElf not found. Please build the project first using .\scripts\build.ps1"
     exit 1
 }
+
+# Determine RESC script: custom argument, or auto-detect multi-node vs single-node
+if ($Resc) {
+    $RescRelPath = $Resc
+    $Mode = "Custom Script"
+} elseif (Test-Path $ClientElf) {
+    $RescRelPath = "renode/mimxrt1064-network-multinode.resc"
+    $Mode = "Multi-Node Network Verification (Server: 192.168.0.100, Client: 192.168.0.101)"
+} else {
+    $RescRelPath = "renode/mimxrt1064-evk.resc"
+    $Mode = "Single-Node Demo"
+}
+$RescFullPath = Join-Path $BoardDir $RescRelPath
 
 # Find Renode executable
 $RenodeExe = (Get-Command renode -ErrorAction SilentlyContinue).Source
@@ -34,10 +50,14 @@ Write-Host "=========================================="
 Write-Host "Starting Renode Simulation"
 Write-Host "=========================================="
 Write-Host "Renode:     $RenodeExe"
+Write-Host "Mode:       $Mode"
 Write-Host "Script:     $RescFullPath"
-Write-Host "Target ELF: $ElfPath"
+Write-Host "Server ELF: $ServerElf"
+if (Test-Path $ClientElf) {
+    Write-Host "Client ELF: $ClientElf"
+}
 Write-Host ""
-Write-Host "Opening Renode Monitor and LPUART1 terminal analyzer..."
+Write-Host "Opening Renode Monitor and LPUART1 terminal analyzer(s)..."
 Write-Host "To exit Renode, type 'quit' in the Renode Monitor or close the window."
 Write-Host "=========================================="
 

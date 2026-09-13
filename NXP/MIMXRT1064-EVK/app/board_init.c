@@ -8,7 +8,7 @@
  * SPDX-License-Identifier: MIT
  *
  * Contributors:
- *    Ali Eissa - 2026 NXP i.MX RT1064 port.
+ *    Ali Eissa - 2026 version.
  */
 
 #include "board_init.h"
@@ -46,4 +46,7 @@ void board_init(void)
 
     /* 6. Initialize LPUART1 Serial Console at 115200 baud */
     console_init();
+
+    /* 7. Configure Ethernet Pin Muxing (RMII and MDC/MDIO) */
+    BOARD_InitENET();
 }
