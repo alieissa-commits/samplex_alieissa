@@ -22,10 +22,25 @@ if (-not (Test-Path $ServerElf)) {
     exit 1
 }
 
-# Determine RESC script: custom argument, or auto-detect multi-node vs single-node
+# Determine RESC script: custom argument, or auto-detect based on cached demo
+$cachedDemo = ""
+$cacheFile = Join-Path $BoardDir "build/CMakeCache.txt"
+if (Test-Path $cacheFile) {
+    $match = Select-String -Path $cacheFile -Pattern "^ACTIVE_DEMO:STRING=(.*)$"
+    if ($match) {
+        $cachedDemo = $match.Matches.Groups[1].Value.Trim()
+    }
+}
+
 if ($Resc) {
     $RescRelPath = $Resc
     $Mode = "Custom Script"
+} elseif ($cachedDemo -eq "netx_trng_console") {
+    $RescRelPath = "renode/mimxrt1064-trng-console.resc"
+    $Mode = "Hardware TRNG Console (Server: 192.168.0.100, Client: 192.168.0.101)"
+} elseif ($cachedDemo -eq "netx_echo") {
+    $RescRelPath = "renode/mimxrt1064-network-multinode.resc"
+    $Mode = "Multi-Node Network Echo Verification (Server: 192.168.0.100, Client: 192.168.0.101)"
 } elseif (Test-Path $ClientElf) {
     $RescRelPath = "renode/mimxrt1064-network-multinode.resc"
     $Mode = "Multi-Node Network Verification (Server: 192.168.0.100, Client: 192.168.0.101)"
