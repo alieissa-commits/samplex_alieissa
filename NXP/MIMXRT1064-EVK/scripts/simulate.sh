@@ -22,9 +22,20 @@ if [ ! -f "${SERVER_ELF}" ]; then
     exit 1
 fi
 
+CACHED_DEMO=""
+if [ -f "${BOARD_DIR}/build/CMakeCache.txt" ]; then
+    CACHED_DEMO=$(grep -E "^ACTIVE_DEMO:STRING=" "${BOARD_DIR}/build/CMakeCache.txt" | cut -d'=' -f2 | tr -d ' \r\n')
+fi
+
 if [ -n "$1" ]; then
     RESC_REL_PATH="$1"
     MODE="Custom Script"
+elif [ "$CACHED_DEMO" = "netx_trng_console" ]; then
+    RESC_REL_PATH="renode/mimxrt1064-trng-console.resc"
+    MODE="Hardware TRNG Console (Server: 192.168.0.100, Client: 192.168.0.101)"
+elif [ "$CACHED_DEMO" = "netx_echo" ]; then
+    RESC_REL_PATH="renode/mimxrt1064-network-multinode.resc"
+    MODE="Multi-Node Network Echo Verification (Server: 192.168.0.100, Client: 192.168.0.101)"
 elif [ -f "${CLIENT_ELF}" ]; then
     RESC_REL_PATH="renode/mimxrt1064-network-multinode.resc"
     MODE="Multi-Node Network Verification (Server: 192.168.0.100, Client: 192.168.0.101)"

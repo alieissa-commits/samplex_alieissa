@@ -28,8 +28,8 @@ project(mimxrt1064_threadx C CXX ASM)
 # Ensure executable output (elf, bin, hex) goes directly to the top-level build directory
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
 
-# Select the active demo to build (default: netx_echo, or threadx_basic)
-set(ACTIVE_DEMO "netx_echo" CACHE STRING "Active demo name to build: netx_echo, threadx_basic")
+# Select the active demo to build (default: netx_echo, netx_trng_console, or threadx_basic)
+set(ACTIVE_DEMO "netx_echo" CACHE STRING "Active demo name to build: netx_echo, netx_trng_console, threadx_basic")
 
 # Set up paths for MCUXpresso SDK
 set(SDK_DIR "${CMAKE_CURRENT_LIST_DIR}/lib/mcux-sdk")
@@ -118,6 +118,7 @@ add_library(board_bsp OBJECT
     app/startup/tx_initialize_low_level.S
     app/board_init.c
     app/console.c
+    app/trng.c
     app/sysmem.c
     app/syscalls.c
 )
