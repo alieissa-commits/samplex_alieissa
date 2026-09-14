@@ -40,4 +40,6 @@ cpu PC `sysbus ReadDoubleWord 0x70002004`
 cpu SP `sysbus ReadDoubleWord 0x70002000`
 
 # 4. Start Simulation
-start
+emulation RunFor "3"
+
+quit

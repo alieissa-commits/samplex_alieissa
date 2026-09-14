@@ -22,5 +22,6 @@ cpu VectorTableOffset 0x70002000
 sysbus LoadELF $bin
 cpu PC `sysbus ReadDoubleWord 0x70002004`
 cpu SP `sysbus ReadDoubleWord 0x70002000`
+emulation RunFor "3"
 
-start
+quit

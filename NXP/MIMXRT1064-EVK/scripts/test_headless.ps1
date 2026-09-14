@@ -102,22 +102,24 @@ Write-Host "Log Target:  $TargetLog"
 Write-Host ""
 Write-Host "[INFO] Launching Renode in headless mode..."
 
-# Build argument list for Renode: pass explicit binary paths, include script, sleep for duration, and quit
-# Build argument list for Renode: pass clean relative paths, include script, sleep for duration, and quit
-$initCmd = ""
+# Generate clean ci_runner.resc
+$ciRunner = Join-Path $BuildDir "ci_runner.resc"
+$rescLines = @()
 if ($null -ne $Seed) {
-    $initCmd += "emulation SetSeed $Seed; "
+    $rescLines += "emulation SetSeed $Seed"
 }
-$initCmd += "`$bin = @`"$serverElfRel`"; `$bin_server = @`"$serverElfRel`"; "
+$rescLines += "`$bin = @$serverElfRel"
+$rescLines += "`$bin_server = @$serverElfRel"
 if (Test-Path $ClientElf) {
-    $initCmd += "`$bin_client = @`"$clientElfRel`"; "
+    $rescLines += "`$bin_client = @$clientElfRel"
 }
-$initCmd += "include @$RescRelPath; sleep $TimeoutSeconds; quit"
+$rescLines += "include @$RescRelPath"
+$rescLines | Set-Content -Path $ciRunner -Encoding ASCII
 
 Push-Location $BoardDir
 
 # Execute Renode directly with clean argument quoting
-& $RenodeExe --plain --disable-xwt -e "$initCmd"
+& $RenodeExe --plain --disable-gui --port -1 -e "include @build/ci_runner.resc"
 
 Pop-Location
 

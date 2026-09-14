@@ -16,7 +16,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BOARD_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 BUILD_DIR="${BOARD_DIR}/build"
 
-TIMEOUT_SECONDS=24
+TIMEOUT_SECONDS=60
 SEED="12345"
 DEMO=""
 
@@ -105,17 +105,33 @@ echo "[INFO] Launching Renode in headless mode..."
 
 cd "${BOARD_DIR}"
 
-RENODE_EXEC_CMD=""
-if [ -n "${SEED}" ]; then
-    RENODE_EXEC_CMD="emulation SetSeed ${SEED}; "
+SERVER_ELF_REL="build/app/demos/${CACHED_DEMO}/mimxrt1064_threadx.elf"
+CLIENT_ELF_REL="build/app/demos/${CACHED_DEMO}/mimxrt1064_client.elf"
+if [ ! -f "${BOARD_DIR}/${SERVER_ELF_REL}" ] && [ -f "${BUILD_DIR}/mimxrt1064_threadx.elf" ]; then
+    SERVER_ELF_REL="build/mimxrt1064_threadx.elf"
+    CLIENT_ELF_REL="build/mimxrt1064_client.elf"
 fi
-RENODE_EXEC_CMD="${RENODE_EXEC_CMD}\$bin = @\"${SERVER_ELF}\"; \$bin_server = @\"${SERVER_ELF}\"; "
-if [ -f "${CLIENT_ELF}" ]; then
-    RENODE_EXEC_CMD="${RENODE_EXEC_CMD}\$bin_client = @\"${CLIENT_ELF}\"; "
-fi
-RENODE_EXEC_CMD="${RENODE_EXEC_CMD}include @\"${RESC_REL_PATH}\"; sleep ${TIMEOUT_SECONDS}; quit"
 
-"${RENODE_CMD}" --plain --disable-xwt -e "${RENODE_EXEC_CMD}" || true
+CI_RUNNER="${BUILD_DIR}/ci_runner.resc"
+mkdir -p "${BUILD_DIR}"
+rm -f "${CI_RUNNER}"
+
+if [ -n "${SEED}" ]; then
+    echo "emulation SetSeed ${SEED}" >> "${CI_RUNNER}"
+fi
+echo "\$bin = @${SERVER_ELF_REL}" >> "${CI_RUNNER}"
+echo "\$bin_server = @${SERVER_ELF_REL}" >> "${CI_RUNNER}"
+if [ -f "${BOARD_DIR}/${CLIENT_ELF_REL}" ]; then
+    echo "\$bin_client = @${CLIENT_ELF_REL}" >> "${CI_RUNNER}"
+fi
+echo "include @${RESC_REL_PATH}" >> "${CI_RUNNER}"
+
+TIMEOUT_CMD=()
+if command -v timeout &> /dev/null; then
+    TIMEOUT_CMD=(timeout "${TIMEOUT_SECONDS}s")
+fi
+
+"${TIMEOUT_CMD[@]}" "${RENODE_CMD}" --plain --disable-gui --port -1 -e "include @build/ci_runner.resc" < /dev/null || true
 
 PASS=0
 if [ -f "${TARGET_LOG}" ]; then
