@@ -12,6 +12,9 @@
 :name: MIMXRT1064-EVK Headless Single-Node CI Test
 :description: Headless single-node verification capturing LPUART1 output to log file.
 
+Clear
+
+using sysbus
 mach create "mimxrt1064-evk"
 $platform?=$ORIGIN/mimxrt1064-evk.repl
 machine LoadPlatformDescription $platform

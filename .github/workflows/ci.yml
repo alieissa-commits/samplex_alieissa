@@ -392,6 +392,11 @@ jobs:
       - name: Put Renode on PATH
         run: echo "$HOME/renode" >> $GITHUB_PATH
 
+      - name: Link Renode Scripts & Dependencies
+        run: |
+          ln -sf $HOME/renode/scripts $HOME/renode/bin/scripts 2>/dev/null || true
+          ln -sf $HOME/renode/platforms $HOME/renode/bin/platforms 2>/dev/null || true
+
       - name: Report Runner Environment & Diagnostics
         run: |
           echo "=== System Architecture & Kernel ==="
