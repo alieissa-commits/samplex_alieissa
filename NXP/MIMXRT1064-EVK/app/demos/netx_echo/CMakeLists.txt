@@ -10,12 +10,14 @@
 #     Ali Eissa - 2026 version.
 
 # Server Executable Target (mimxrt1064_threadx)
-add_executable(${PROJECT_NAME}
+set(SERVER_TARGET "demo_netx_echo_server")
+add_executable(${SERVER_TARGET}
     main.c
 )
+set_target_properties(${SERVER_TARGET} PROPERTIES OUTPUT_NAME "mimxrt1064_threadx")
 
 # Set compile definitions for server
-target_compile_definitions(${PROJECT_NAME}
+target_compile_definitions(${SERVER_TARGET}
     PRIVATE
         CPU_MIMXRT1064DVL6A
         XIP_EXTERNAL_FLASH=1
@@ -28,7 +30,7 @@ target_compile_definitions(${PROJECT_NAME}
 )
 
 # Include paths for server
-target_include_directories(${PROJECT_NAME}
+target_include_directories(${SERVER_TARGET}
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${CMAKE_CURRENT_SOURCE_DIR}/../..
@@ -44,7 +46,7 @@ target_include_directories(${PROJECT_NAME}
 )
 
 # Link libraries for server
-target_link_libraries(${PROJECT_NAME}
+target_link_libraries(${SERVER_TARGET}
     PRIVATE
         board_bsp
         threadx
@@ -54,14 +56,15 @@ target_link_libraries(${PROJECT_NAME}
 )
 
 # Apply GCC linker script and post-build outputs for server
-set_target_linker(${PROJECT_NAME} "${CMAKE_CURRENT_SOURCE_DIR}/../../startup/MIMXRT1064xxxxx_flexspi_nor.ld")
-post_build(${PROJECT_NAME})
+set_target_linker(${SERVER_TARGET} "${CMAKE_CURRENT_SOURCE_DIR}/../../startup/MIMXRT1064xxxxx_flexspi_nor.ld")
+post_build(${SERVER_TARGET})
 
 # Automated Verification Client Executable Target (mimxrt1064_client)
-set(CLIENT_TARGET "mimxrt1064_client")
+set(CLIENT_TARGET "demo_netx_echo_client")
 add_executable(${CLIENT_TARGET}
     client_main.c
 )
+set_target_properties(${CLIENT_TARGET} PROPERTIES OUTPUT_NAME "mimxrt1064_client")
 
 # Set compile definitions for client
 target_compile_definitions(${CLIENT_TARGET}

@@ -1,0 +1,43 @@
+#  Copyright (c) 2026 Eclipse ThreadX contributors
+# 
+#  This program and the accompanying materials are made available 
+#  under the terms of the MIT license which is available at
+#  https://opensource.org/license/mit.
+# 
+#  SPDX-License-Identifier: MIT
+# 
+#  Contributors: 
+#     Ali Eissa - 2026 version.
+
+:name: MIMXRT1064-EVK Headless Multi-Node CI Test
+:description: Headless two-node verification connecting server and client via virtual switch.
+
+# 1. Create Virtual Ethernet Switch
+emulation CreateSwitch "switch"
+
+# 2. Server Machine (192.168.0.100)
+mach create "server"
+machine LoadPlatformDescription $ORIGIN/mimxrt1064-evk.repl
+connector Connect sysbus.enet switch
+sysbus.lpuart1 CreateFileBackend $ORIGIN/../build/server_uart.log true
+
+$bin_server?=$ORIGIN/../build/mimxrt1064_threadx.elf
+cpu VectorTableOffset 0x70002000
+sysbus LoadELF $bin_server
+cpu PC `sysbus ReadDoubleWord 0x70002004`
+cpu SP `sysbus ReadDoubleWord 0x70002000`
+
+# 3. Client Machine (192.168.0.101)
+mach create "client"
+machine LoadPlatformDescription $ORIGIN/mimxrt1064-evk.repl
+connector Connect sysbus.enet switch
+sysbus.lpuart1 CreateFileBackend $ORIGIN/../build/client_uart.log true
+
+$bin_client?=$ORIGIN/../build/mimxrt1064_client.elf
+cpu VectorTableOffset 0x70002000
+sysbus LoadELF $bin_client
+cpu PC `sysbus ReadDoubleWord 0x70002004`
+cpu SP `sysbus ReadDoubleWord 0x70002000`
+
+# 4. Start Simulation
+start

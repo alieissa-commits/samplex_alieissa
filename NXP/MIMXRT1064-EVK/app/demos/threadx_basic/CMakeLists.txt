@@ -9,12 +9,14 @@
 #  Contributors: 
 #     Ali Eissa - 2026 version.
 
-add_executable(${PROJECT_NAME}
+set(DEMO_TARGET "demo_threadx_basic")
+add_executable(${DEMO_TARGET}
     main.c
 )
+set_target_properties(${DEMO_TARGET} PROPERTIES OUTPUT_NAME "mimxrt1064_threadx")
 
 # Set compile definitions for our executable
-target_compile_definitions(${PROJECT_NAME}
+target_compile_definitions(${DEMO_TARGET}
     PRIVATE
         CPU_MIMXRT1064DVL6A
         XIP_EXTERNAL_FLASH=1
@@ -27,7 +29,7 @@ target_compile_definitions(${PROJECT_NAME}
 )
 
 # Include paths for the executable target
-target_include_directories(${PROJECT_NAME}
+target_include_directories(${DEMO_TARGET}
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${CMAKE_CURRENT_SOURCE_DIR}/../..
@@ -41,7 +43,7 @@ target_include_directories(${PROJECT_NAME}
 )
 
 # Link libraries
-target_link_libraries(${PROJECT_NAME}
+target_link_libraries(${DEMO_TARGET}
     PRIVATE
         board_bsp
         threadx
@@ -49,7 +51,7 @@ target_link_libraries(${PROJECT_NAME}
 )
 
 # Apply GCC linker script and print memory usage (utilities.cmake function)
-set_target_linker(${PROJECT_NAME} "${CMAKE_CURRENT_SOURCE_DIR}/../../startup/MIMXRT1064xxxxx_flexspi_nor.ld")
+set_target_linker(${DEMO_TARGET} "${CMAKE_CURRENT_SOURCE_DIR}/../../startup/MIMXRT1064xxxxx_flexspi_nor.ld")
 
 # Post-build commands to generate raw .bin and .hex files
-post_build(${PROJECT_NAME})
+post_build(${DEMO_TARGET})

@@ -186,7 +186,7 @@ try {
     # 3. Fetch CMSIS Core headers (standard ARM CMSIS-Core include files)
     Write-Host "[INFO] Cloning CMSIS Core headers (depth=1)..."
     $cmsisCloneDir = Join-Path $TempDir "cmsis_core_repo"
-    git clone --depth 1 https://github.com/STMicroelectronics/cmsis-core.git $cmsisCloneDir
+    git clone --depth 1 https://github.com/ARM-software/CMSIS_5.git $cmsisCloneDir
     if ($LASTEXITCODE -ne 0) {
         throw "Failed to clone CMSIS Core repository"
     }

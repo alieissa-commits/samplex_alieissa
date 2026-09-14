@@ -1,34 +1,37 @@
 # Third-Party Software Notices
 
-This directory contains build automation scripts and configurations that download and compile third-party software components. This notice lists the licenses and copyrights applicable to those components.
+This directory contains third-party software components included in the repository as well as build automation scripts and configurations that download and compile external dependencies. This notice lists the licenses and copyrights applicable to those components.
 
 ---
 
-## 1. NXP MCUXpresso SDK Drivers & Device Support
-* **Source**: https://github.com/nxp-mcuxpresso/mcuxsdk-core / https://mcuxpresso.nxp.com/
+## 1. NXP MCUXpresso SDK Drivers, Device Support & Startup Files
+* **Source**: https://github.com/nxp-mcuxpresso/mcuxsdk-core / https://github.com/nxp-mcuxpresso/mcuxsdk-examples / https://mcuxpresso.nxp.com
+* **Location**: `app/startup/startup_mimxrt1064.S`, `app/startup/MIMXRT1064xxxxx_flexspi_nor.ld`, and `lib/mcux-sdk/`
 * **License**: BSD 3-Clause
 
 ```text
-Copyright 2016-2026 NXP
-All rights reserved.
+Copyright (c) 2015-2016, Freescale Semiconductor, Inc.
+Copyright 2018-2025 NXP
+
+The BSD 3 Clause License
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
 
-1. Redistributions of source code must retain the above copyright notice,
-   this list of conditions and the following disclaimer.
+1. Redistributions of source code must retain the above copyright notice, this
+list of conditions and the following disclaimer.
 
 2. Redistributions in binary form must reproduce the above copyright notice,
-   this list of conditions and the following disclaimer in the documentation
-   and/or other materials provided with the distribution.
+this list of conditions and the following disclaimer in the documentation
+and/or other materials provided with the distribution.
 
 3. Neither the name of the copyright holder nor the names of its contributors
-   may be used to endorse or promote products derived from this software
-   without specific prior written permission.
+may be used to endorse or promote products derived from this software without
+specific prior written permission.
 
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
 DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
 FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
 DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
@@ -41,7 +44,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ---
 
 ## 2. ARM CMSIS Core
-* **Source**: https://github.com/ARM-software/CMSIS_5 / https://github.com/STMicroelectronics/cmsis-core
+* **Source**: https://github.com/ARM-software/CMSIS_5
+* **Location**: `lib/mcux-sdk/CMSIS/Include/`
 * **License**: Apache License 2.0
 
 ```text

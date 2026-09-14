@@ -25,11 +25,8 @@ include(utilities)
 # Define the Project
 project(mimxrt1064_threadx C CXX ASM)
 
-# Ensure executable output (elf, bin, hex) goes directly to the top-level build directory
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
-
-# Select the active demo to build (default: netx_echo, netx_trng_console, or threadx_basic)
-set(ACTIVE_DEMO "netx_echo" CACHE STRING "Active demo name to build: netx_echo, netx_trng_console, threadx_basic")
+# Select demo to build: all (default), threadx_basic, netx_echo, netx_trng_console
+set(ACTIVE_DEMO "all" CACHE STRING "Active demo name to build: all, netx_echo, netx_trng_console, threadx_basic")
 
 # Set up paths for MCUXpresso SDK
 set(SDK_DIR "${CMAKE_CURRENT_LIST_DIR}/lib/mcux-sdk")
@@ -37,17 +34,14 @@ if(NOT EXISTS "${SDK_DIR}/devices/MIMXRT1064/MIMXRT1064.h")
     message(FATAL_ERROR "NXP SDK dependencies missing! Please run 'scripts/fetch_sdk.ps1' or 'scripts/fetch_sdk.sh' first.")
 endif()
 
-# Dynamic Middleware Auto-Detection
-# Check if the active demo uses NetX Duo by looking for nx_user.h
-if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/app/demos/${ACTIVE_DEMO}/nx_user.h")
-    set(USE_NETXDUO ON)
+# Dynamic Middleware Configuration
+if(NOT ACTIVE_DEMO STREQUAL "all" AND EXISTS "${CMAKE_CURRENT_LIST_DIR}/app/demos/${ACTIVE_DEMO}/nx_user.h")
     set(NX_USER_FILE "${CMAKE_CURRENT_LIST_DIR}/app/demos/${ACTIVE_DEMO}/nx_user.h" CACHE STRING "Enable NetX Duo user configuration" FORCE)
 else()
-    set(USE_NETXDUO OFF)
+    set(NX_USER_FILE "${CMAKE_CURRENT_LIST_DIR}/lib/netxduo/nx_user.h" CACHE STRING "Enable NetX Duo user configuration" FORCE)
 endif()
 
-# Check if the active demo has custom tx_user.h; otherwise fallback to lib/threadx/tx_user.h
-if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/app/demos/${ACTIVE_DEMO}/tx_user.h")
+if(NOT ACTIVE_DEMO STREQUAL "all" AND EXISTS "${CMAKE_CURRENT_LIST_DIR}/app/demos/${ACTIVE_DEMO}/tx_user.h")
     set(TX_USER_FILE "${CMAKE_CURRENT_LIST_DIR}/app/demos/${ACTIVE_DEMO}/tx_user.h" CACHE STRING "Enable TX user configuration" FORCE)
     set(TX_USER_FILE_DIR "${CMAKE_CURRENT_LIST_DIR}/app/demos/${ACTIVE_DEMO}")
 else()
@@ -59,12 +53,10 @@ endif()
 set(THREADX_DIR "${CMAKE_CURRENT_LIST_DIR}/../../libs/threadx")
 add_subdirectory(${THREADX_DIR} threadx)
 
-if(USE_NETXDUO)
-    # Compile NetX Duo TCP/IP Stack from root shared libs submodule
-    set(NXD_ENABLE_FILE_SERVERS OFF CACHE BOOL "Disable FileX dependency in NetX Duo" FORCE)
-    set(NETXDUO_DIR "${CMAKE_CURRENT_LIST_DIR}/../../libs/netxduo")
-    add_subdirectory(${NETXDUO_DIR} netxduo)
-endif()
+# Compile NetX Duo TCP/IP Stack from root shared libs submodule (cached for networking demos)
+set(NXD_ENABLE_FILE_SERVERS OFF CACHE BOOL "Disable FileX dependency in NetX Duo" FORCE)
+set(NETXDUO_DIR "${CMAKE_CURRENT_LIST_DIR}/../../libs/netxduo")
+add_subdirectory(${NETXDUO_DIR} netxduo)
 
 # Compile the NXP MCUXpresso Driver & Board Library as an Object Library
 set(SDK_TARGET mcux_sdk)
@@ -153,9 +145,8 @@ target_link_libraries(board_bsp
         threadx
 )
 
-# 2. Define conditional NetX Duo driver library target
-if(USE_NETXDUO)
-    add_library(netx_imxrt_driver OBJECT
+# 2. Define NetX Duo driver library targets (cached for networking demos)
+add_library(netx_imxrt_driver OBJECT
         ${SDK_DIR}/drivers/netx_driver/nx_driver_imxrt1062.c
         ${SDK_DIR}/drivers/netx_driver/gnu/nx_driver_imxrt1062_low_level.S
         ${SDK_DIR}/components/phy/fsl_phy.c
@@ -179,7 +170,7 @@ if(USE_NETXDUO)
             ${SDK_DIR}/drivers/netx_driver
             ${SDK_DIR}/components/phy
             ${CMAKE_CURRENT_LIST_DIR}/app
-            ${CMAKE_CURRENT_LIST_DIR}/app/demos/${ACTIVE_DEMO}
+            ${CMAKE_CURRENT_LIST_DIR}/lib/netxduo
             ${SDK_DIR}/CMSIS/Include
             ${SDK_DIR}/devices/MIMXRT1064
             ${SDK_DIR}/drivers
@@ -222,7 +213,7 @@ if(USE_NETXDUO)
             ${SDK_DIR}/drivers/netx_driver
             ${SDK_DIR}/components/phy
             ${CMAKE_CURRENT_LIST_DIR}/app
-            ${CMAKE_CURRENT_LIST_DIR}/app/demos/${ACTIVE_DEMO}
+            ${CMAKE_CURRENT_LIST_DIR}/lib/netxduo
             ${SDK_DIR}/CMSIS/Include
             ${SDK_DIR}/devices/MIMXRT1064
             ${SDK_DIR}/drivers
@@ -239,7 +230,12 @@ if(USE_NETXDUO)
             mcux_sdk
     )
     target_compile_options(netx_imxrt_driver_client PRIVATE -Wno-unused-variable)
-endif()
 
-# 3. Add the active demo subdirectory to build the executable target
-add_subdirectory(app/demos/${ACTIVE_DEMO})
+# 3. Add demo subdirectories to build executable targets
+if(ACTIVE_DEMO STREQUAL "all")
+    add_subdirectory(app/demos/threadx_basic)
+    add_subdirectory(app/demos/netx_echo)
+    add_subdirectory(app/demos/netx_trng_console)
+else()
+    add_subdirectory(app/demos/${ACTIVE_DEMO})
+endif()
