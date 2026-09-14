@@ -159,6 +159,9 @@ def run_test(demo_name, seed=None, timeout_seconds=300):
         bufsize=1,
     )
 
+    os.makedirs(build_dir, exist_ok=True)
+    log_file_path = os.path.join(build_dir, f"renode_test_{demo_name}.log")
+
     output_q = queue.Queue()
     reader_t = threading.Thread(target=reader_thread_fn, args=(proc.stdout, output_q), daemon=True)
     reader_t.start()
@@ -166,35 +169,40 @@ def run_test(demo_name, seed=None, timeout_seconds=300):
     found_marker = False
     start_time = time.time()
 
-    try:
-        while time.time() - start_time < timeout_seconds:
-            try:
-                line = output_q.get(timeout=0.1)
-                sys.stdout.write(line)
-                sys.stdout.flush()
-
-                if config["marker"] in line:
-                    found_marker = True
-                    break
-            except queue.Empty:
-                if proc.poll() is not None:
-                    # Drain remaining output
-                    while not output_q.empty():
-                        line = output_q.get_nowait()
-                        sys.stdout.write(line)
-                        sys.stdout.flush()
-                        if config["marker"] in line:
-                            found_marker = True
-                    break
-    finally:
+    with open(log_file_path, "w", encoding="utf-8") as log_f:
         try:
-            proc.terminate()
-            proc.wait(timeout=3)
-        except Exception:
+            while time.time() - start_time < timeout_seconds:
+                try:
+                    line = output_q.get(timeout=0.1)
+                    sys.stdout.write(line)
+                    sys.stdout.flush()
+                    log_f.write(line)
+                    log_f.flush()
+
+                    if config["marker"] in line:
+                        found_marker = True
+                        break
+                except queue.Empty:
+                    if proc.poll() is not None:
+                        # Drain remaining output
+                        while not output_q.empty():
+                            line = output_q.get_nowait()
+                            sys.stdout.write(line)
+                            sys.stdout.flush()
+                            log_f.write(line)
+                            log_f.flush()
+                            if config["marker"] in line:
+                                found_marker = True
+                        break
+        finally:
             try:
-                proc.kill()
+                proc.terminate()
+                proc.wait(timeout=3)
             except Exception:
-                pass
+                try:
+                    proc.kill()
+                except Exception:
+                    pass
 
     print("")
     print("==========================================")

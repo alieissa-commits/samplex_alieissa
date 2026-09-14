@@ -12,9 +12,10 @@ name: SampleX CI Verification Pipeline
 
 on:
   push:
-    branches: [ main, master, dev, 'feat/**' ]
+    branches: [ main, master, dev, 'feat/**', 'test/**' ]
   pull_request:
     branches: [ main, master, dev ]
+  workflow_dispatch:
 
 jobs:
   build-riscv-polarfire:
@@ -360,6 +361,11 @@ jobs:
           name: nxp-mimxrt1064-demo-elfs
           path: NXP/MIMXRT1064-EVK/build/app/demos
 
+      - name: Inspect Downloaded ELF Artifacts
+        run: |
+          echo "=== Extracted NXP Demo ELF Artifacts ==="
+          ls -laR NXP/MIMXRT1064-EVK/build/app/demos/
+
       - name: Cache the portable Renode environment
         id: cache-renode
         uses: actions/cache@v4
@@ -378,8 +384,23 @@ jobs:
           tar -xzf "${TARBALL}" -C $HOME/renode --strip-components=1
           rm "${TARBALL}"
 
+      - name: Install Renode System Prerequisites
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libx11-6 libxkbcommon-x11-0 libxcb1
+
       - name: Put Renode on PATH
         run: echo "$HOME/renode" >> $GITHUB_PATH
+
+      - name: Report Runner Environment & Diagnostics
+        run: |
+          echo "=== System Architecture & Kernel ==="
+          uname -a
+          lsb_release -a
+          echo "=== Renode Version ==="
+          renode --version
+          echo "=== Python Version ==="
+          python3 --version
 
       - name: Run Deterministic Headless Renode Test (threadx_basic)
         run: |
@@ -392,4 +413,14 @@ jobs:
       - name: Run Deterministic Headless Renode Test (netx_trng_console)
         run: |
           python3 NXP/MIMXRT1064-EVK/scripts/test_renode.py --demo netx_trng_console --seed 12345
+
+      - name: Upload Renode Execution Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nxp-renode-execution-logs
+          path: |
+            NXP/MIMXRT1064-EVK/build/*.log
+            NXP/MIMXRT1064-EVK/*.log
+          if-no-files-found: ignore
 

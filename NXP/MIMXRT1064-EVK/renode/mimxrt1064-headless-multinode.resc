@@ -49,6 +49,6 @@ macro reset
 runMacro $reset
 
 # 4. Start Simulation
-emulation RunFor "200"
+emulation RunFor "6"
 
 quit
