@@ -19,10 +19,16 @@ machine LoadPlatformDescription $platform
 showAnalyzer sysbus.lpuart1
 
 $bin?=$ORIGIN/../build/app/demos/threadx_basic/mimxrt1064_threadx.elf
-cpu VectorTableOffset 0x70002000
-sysbus LoadELF $bin
-cpu PC `sysbus ReadDoubleWord 0x70002004`
-cpu SP `sysbus ReadDoubleWord 0x70002000`
+
+macro reset
+"""
+    sysbus LoadELF $bin
+    cpu VectorTableOffset 0x70002000
+    cpu PC `sysbus ReadDoubleWord 0x70002004`
+    cpu SP `sysbus ReadDoubleWord 0x70002000`
+"""
+runMacro $reset
+
 emulation RunFor "3"
 
 quit

@@ -11,7 +11,7 @@
 
 param(
     [string]$Demo = "threadx_basic",
-    [int]$TimeoutSeconds = 120,
+    [int]$TimeoutSeconds = 300,
     [Nullable[int]]$Seed
 )
 

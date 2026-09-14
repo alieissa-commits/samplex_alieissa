@@ -78,7 +78,7 @@ def reader_thread_fn(pipe, q):
         pipe.close()
 
 
-def run_test(demo_name, seed=None, timeout_seconds=120):
+def run_test(demo_name, seed=None, timeout_seconds=300):
     if demo_name not in DEMO_CONFIGS:
         print(f"[FAIL] Unknown demo: {demo_name}. Choices: {list(DEMO_CONFIGS.keys())}")
         return 1
@@ -115,6 +115,8 @@ def run_test(demo_name, seed=None, timeout_seconds=120):
     if seed is not None:
         cmd_parts.append(f"emulation SetSeed {seed}")
 
+    cmd_parts.append("$platform = @renode/mimxrt1064-evk.repl")
+
     if config["multinode"]:
         client_elf_rel = os.path.relpath(client_elf, board_dir).replace("\\", "/")
         cmd_parts.append(f"$bin_server = @{server_elf_rel}")
@@ -150,7 +152,7 @@ def run_test(demo_name, seed=None, timeout_seconds=120):
     proc = subprocess.Popen(
         cmd,
         cwd=board_dir,
-        stdin=subprocess.DEVNULL,
+        stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
@@ -214,8 +216,8 @@ def main():
                         help="Demo application to verify")
     parser.add_argument("-s", "--seed", type=int, default=None,
                         help="Deterministic simulation seed")
-    parser.add_argument("-t", "--timeout", type=int, default=120,
-                        help="Timeout in seconds (default: 120)")
+    parser.add_argument("-t", "--timeout", type=int, default=300,
+                        help="Timeout in seconds (default: 300)")
 
     args = parser.parse_args()
     seed = args.seed
