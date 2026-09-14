@@ -19,14 +19,14 @@ NUM_JOBS=4
 
 CLEAN=0
 REBUILD=0
-DEMO="netx_echo"
+DEMO="all"
 
 # Parse arguments
 while [[ "$#" -gt 0 ]]; do
     case $1 in
         --clean) CLEAN=1 ;;
         --rebuild) REBUILD=1 ;;
-        --demo) DEMO="$2"; shift ;;
+        -d|--demo) DEMO="$2"; shift ;;
         *) echo "Unknown parameter passed: $1"; exit 1 ;;
     esac
     shift
@@ -84,11 +84,24 @@ ninja -j ${NUM_JOBS}
 
 echo ""
 echo "[SUCCESS] Build finished successfully!"
-echo "Server Firmware ELF: ${BUILD_DIR}/mimxrt1064_threadx.elf"
-echo "Server Firmware BIN: ${BUILD_DIR}/mimxrt1064_threadx.bin"
-echo "Server Firmware HEX: ${BUILD_DIR}/mimxrt1064_threadx.hex"
-if [ -f "${BUILD_DIR}/mimxrt1064_client.elf" ]; then
-    echo "Client Firmware ELF: ${BUILD_DIR}/mimxrt1064_client.elf"
-    echo "Client Firmware BIN: ${BUILD_DIR}/mimxrt1064_client.bin"
-    echo "Client Firmware HEX: ${BUILD_DIR}/mimxrt1064_client.hex"
+
+if [ "${DEMO}" = "all" ]; then
+    DEMOS_TO_REPORT=("threadx_basic" "netx_echo" "netx_trng_console")
+else
+    DEMOS_TO_REPORT=("${DEMO}")
 fi
+
+for d in "${DEMOS_TO_REPORT[@]}"; do
+    DEMO_DIR="${BUILD_DIR}/app/demos/${d}"
+    if [ -d "${DEMO_DIR}" ]; then
+        echo "[${d}] Output Binaries in ${DEMO_DIR}:"
+        if [ -f "${DEMO_DIR}/mimxrt1064_threadx.elf" ]; then
+            echo "  - Server ELF: ${DEMO_DIR}/mimxrt1064_threadx.elf"
+            echo "  - Server BIN: ${DEMO_DIR}/mimxrt1064_threadx.bin"
+        fi
+        if [ -f "${DEMO_DIR}/mimxrt1064_client.elf" ]; then
+            echo "  - Client ELF: ${DEMO_DIR}/mimxrt1064_client.elf"
+            echo "  - Client BIN: ${DEMO_DIR}/mimxrt1064_client.bin"
+        fi
+    fi
+done

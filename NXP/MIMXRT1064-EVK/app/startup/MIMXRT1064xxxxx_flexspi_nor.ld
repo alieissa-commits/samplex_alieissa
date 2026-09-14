@@ -27,6 +27,10 @@
 ** ###################################################################
 */
 
+/*
+** Adapted memory sections for Eclipse ThreadX RTOS by Eclipse ThreadX contributors.
+*/
+
 /* Entry Point */
 ENTRY(Reset_Handler)
 

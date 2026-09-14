@@ -12,7 +12,7 @@
 param(
     [switch]$Clean,
     [switch]$Rebuild,
-    [string]$Demo = "netx_echo"
+    [string]$Demo = "all"
 )
 
 $BoardDir = Resolve-Path "$PSScriptRoot/.."
@@ -85,13 +85,29 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host ""
 Write-Host "[SUCCESS] Build finished successfully!" -ForegroundColor Green
-Write-Host "Server Firmware ELF: $(Join-Path $BUILD_DIR 'mimxrt1064_threadx.elf')"
-Write-Host "Server Firmware BIN: $(Join-Path $BUILD_DIR 'mimxrt1064_threadx.bin')"
-Write-Host "Server Firmware HEX: $(Join-Path $BUILD_DIR 'mimxrt1064_threadx.hex')"
-if (Test-Path (Join-Path $BUILD_DIR 'mimxrt1064_client.elf')) {
-    Write-Host "Client Firmware ELF: $(Join-Path $BUILD_DIR 'mimxrt1064_client.elf')"
-    Write-Host "Client Firmware BIN: $(Join-Path $BUILD_DIR 'mimxrt1064_client.bin')"
-    Write-Host "Client Firmware HEX: $(Join-Path $BUILD_DIR 'mimxrt1064_client.hex')"
+
+$demosToReport = @()
+if ($Demo -eq "all") {
+    $demosToReport = @("threadx_basic", "netx_echo", "netx_trng_console")
+} else {
+    $demosToReport = @($Demo)
+}
+
+foreach ($d in $demosToReport) {
+    $demoDir = Join-Path $BUILD_DIR "app/demos/$d"
+    if (Test-Path $demoDir) {
+        Write-Host "[$d] Output Binaries in $demoDir :" -ForegroundColor Cyan
+        $serverElf = Join-Path $demoDir "mimxrt1064_threadx.elf"
+        $clientElf = Join-Path $demoDir "mimxrt1064_client.elf"
+        if (Test-Path $serverElf) {
+            Write-Host "  - Server ELF: $serverElf"
+            Write-Host "  - Server BIN: $(Join-Path $demoDir 'mimxrt1064_threadx.bin')"
+        }
+        if (Test-Path $clientElf) {
+            Write-Host "  - Client ELF: $clientElf"
+            Write-Host "  - Client BIN: $(Join-Path $demoDir 'mimxrt1064_client.bin')"
+        }
+    }
 }
 
 Pop-Location

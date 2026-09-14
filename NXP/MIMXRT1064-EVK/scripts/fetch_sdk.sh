@@ -128,7 +128,7 @@ echo ""
 # 3. Fetch CMSIS Core headers
 echo "[INFO] Cloning CMSIS Core headers (depth=1)..."
 CMSIS_CLONE_DIR="${TEMP_DIR}/cmsis_core_repo"
-git clone --depth 1 https://github.com/STMicroelectronics/cmsis-core.git "${CMSIS_CLONE_DIR}"
+git clone --depth 1 https://github.com/ARM-software/CMSIS_5.git "${CMSIS_CLONE_DIR}"
 cp -r "${CMSIS_CLONE_DIR}/CMSIS/Core/Include/"* "${CMSIS_INCLUDE_DEST}/"
 echo "[OK] CMSIS Core headers copied"
 echo ""
