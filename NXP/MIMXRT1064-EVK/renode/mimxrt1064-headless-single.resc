@@ -29,6 +29,6 @@ macro reset
 """
 runMacro $reset
 
-emulation RunFor "3"
+emulation RunFor "30"
 
 quit
