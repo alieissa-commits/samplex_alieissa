@@ -349,6 +349,11 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Set Up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
       - name: Download Built NXP ELFs
         uses: actions/download-artifact@v4
         with:
@@ -378,13 +383,13 @@ jobs:
 
       - name: Run Deterministic Headless Renode Test (threadx_basic)
         run: |
-          bash NXP/MIMXRT1064-EVK/scripts/test_headless.sh -d threadx_basic
+          python3 NXP/MIMXRT1064-EVK/scripts/test_renode.py --demo threadx_basic
 
       - name: Run Deterministic Headless Renode Test (netx_echo)
         run: |
-          bash NXP/MIMXRT1064-EVK/scripts/test_headless.sh -d netx_echo
+          python3 NXP/MIMXRT1064-EVK/scripts/test_renode.py --demo netx_echo
 
       - name: Run Deterministic Headless Renode Test (netx_trng_console)
         run: |
-          bash NXP/MIMXRT1064-EVK/scripts/test_headless.sh -d netx_trng_console -s 12345
+          python3 NXP/MIMXRT1064-EVK/scripts/test_renode.py --demo netx_trng_console --seed 12345
 

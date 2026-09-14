@@ -12,16 +12,18 @@
 :name: MIMXRT1064-EVK Headless Multi-Node CI Test
 :description: Headless two-node verification connecting server and client via virtual switch.
 
+$platform?=$ORIGIN/mimxrt1064-evk.repl
+$bin_server?=$ORIGIN/../build/app/demos/netx_echo/mimxrt1064_threadx.elf
+$bin_client?=$ORIGIN/../build/app/demos/netx_echo/mimxrt1064_client.elf
+
 # 1. Create Virtual Ethernet Switch
 emulation CreateSwitch "switch"
 
 # 2. Server Machine (192.168.0.100)
 mach create "server"
-machine LoadPlatformDescription $ORIGIN/mimxrt1064-evk.repl
+machine LoadPlatformDescription $platform
 connector Connect sysbus.enet switch
-sysbus.lpuart1 CreateFileBackend $ORIGIN/../build/server_uart.log true
 
-$bin_server?=$ORIGIN/../build/mimxrt1064_threadx.elf
 cpu VectorTableOffset 0x70002000
 sysbus LoadELF $bin_server
 cpu PC `sysbus ReadDoubleWord 0x70002004`
@@ -29,17 +31,16 @@ cpu SP `sysbus ReadDoubleWord 0x70002000`
 
 # 3. Client Machine (192.168.0.101)
 mach create "client"
-machine LoadPlatformDescription $ORIGIN/mimxrt1064-evk.repl
+machine LoadPlatformDescription $platform
 connector Connect sysbus.enet switch
-sysbus.lpuart1 CreateFileBackend $ORIGIN/../build/client_uart.log true
+showAnalyzer sysbus.lpuart1
 
-$bin_client?=$ORIGIN/../build/mimxrt1064_client.elf
 cpu VectorTableOffset 0x70002000
 sysbus LoadELF $bin_client
 cpu PC `sysbus ReadDoubleWord 0x70002004`
 cpu SP `sysbus ReadDoubleWord 0x70002000`
 
 # 4. Start Simulation
-emulation RunFor "3"
+emulation RunFor "6"
 
 quit

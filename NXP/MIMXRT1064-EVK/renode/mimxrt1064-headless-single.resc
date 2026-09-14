@@ -13,11 +13,12 @@
 :description: Headless single-node verification capturing LPUART1 output to log file.
 
 mach create "mimxrt1064-evk"
-machine LoadPlatformDescription $ORIGIN/mimxrt1064-evk.repl
+$platform?=$ORIGIN/mimxrt1064-evk.repl
+machine LoadPlatformDescription $platform
 
-sysbus.lpuart1 CreateFileBackend $ORIGIN/../build/server_uart.log true
+showAnalyzer sysbus.lpuart1
 
-$bin?=$ORIGIN/../build/mimxrt1064_threadx.elf
+$bin?=$ORIGIN/../build/app/demos/threadx_basic/mimxrt1064_threadx.elf
 cpu VectorTableOffset 0x70002000
 sysbus LoadELF $bin
 cpu PC `sysbus ReadDoubleWord 0x70002004`
