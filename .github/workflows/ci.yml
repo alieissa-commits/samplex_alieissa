@@ -387,7 +387,7 @@ jobs:
       - name: Install Renode System Prerequisites
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq libx11-6 libxkbcommon-x11-0 libxcb1
+          sudo apt-get install -y -qq libx11-6 libxkbcommon-x11-0 libxcb1 strace
 
       - name: Put Renode on PATH
         run: echo "$HOME/renode" >> $GITHUB_PATH
@@ -406,6 +406,10 @@ jobs:
           renode --version
           echo "=== Python Version ==="
           python3 --version
+
+      - name: Start Interactive Live Debug Session (tmate)
+        uses: mxschmitt/action-tmate@v3
+        timeout-minutes: 20
 
       - name: Run Deterministic Headless Renode Test (threadx_basic)
         run: |
