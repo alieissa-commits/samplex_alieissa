@@ -40,10 +40,6 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-if [ -n "${DEMO}" ]; then
-    echo "[INFO] Ensuring demo '${DEMO}' is active and built..."
-    "${SCRIPT_DIR}/build.sh" --demo "${DEMO}"
-fi
 
 CACHED_DEMO="netx_trng_console"
 if [ -n "${DEMO}" ]; then
