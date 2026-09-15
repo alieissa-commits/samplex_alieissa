@@ -6,10 +6,10 @@
 """
 Automated Granular Diagnostic Script for NXP MIMXRT1064-EVK Renode CI.
 
-Executes Renode monitor commands one-by-one with explicit logging checkpoints.
-If a command freezes or fails, captures kernel stack traces and strace before exiting.
+Executes isolated platform load tests and inspects kernel thread stacks with sudo if stalled.
 """
 
+import glob
 import os
 import queue
 import shutil
@@ -48,8 +48,33 @@ def reader_thread(pipe, q):
         pipe.close()
 
 
+def print_environment_layout():
+    print("\n=== Inspecting Renode Installation Filesystem ===")
+    renode_dir = os.path.expanduser("~/renode")
+    if os.path.isdir(renode_dir):
+        print(f"[FS] Contents of {renode_dir}: {os.listdir(renode_dir)}")
+        for sub in ["scripts", "platforms", "platforms/cpus", "platforms/boards"]:
+            p = os.path.join(renode_dir, sub)
+            if os.path.exists(p):
+                print(f"[FS] Found {p}")
+            else:
+                print(f"[FS] MISSING {p}")
+
+        # Search for imxrt1064 and pydev
+        try:
+            res = subprocess.run(["find", renode_dir, "-name", "*imxrt1064*"], capture_output=True, text=True, timeout=5)
+            print(f"[FS] imxrt1064 files in renode:\n{res.stdout.strip()}")
+            res2 = subprocess.run(["find", renode_dir, "-name", "*ticker*"], capture_output=True, text=True, timeout=5)
+            print(f"[FS] ticker files in renode:\n{res2.stdout.strip()}")
+        except Exception as e:
+            print(f"[FS] find failed: {e}")
+    else:
+        print(f"[FS] {renode_dir} is not a directory.")
+    print("=================================================\n")
+
+
 def dump_linux_diagnostics(pid):
-    print(f"\n[DIAG] === Linux Process Inspection for PID {pid} ===")
+    print(f"\n[DIAG] === Sudo Linux Process Inspection for PID {pid} ===")
     try:
         ps_out = subprocess.run(["ps", "-fp", str(pid)], capture_output=True, text=True, timeout=5)
         print(ps_out.stdout)
@@ -57,47 +82,33 @@ def dump_linux_diagnostics(pid):
         print(f"[DIAG] ps failed: {e}")
 
     try:
-        stack_path = f"/proc/{pid}/stack"
-        if os.path.isfile(stack_path):
-            with open(stack_path, "r") as f:
-                print(f"[DIAG] /proc/{pid}/stack:\n{f.read()}")
+        # Check task thread stacks with sudo
+        cmd = f"for s in /proc/{pid}/task/*/stack; do echo \"--- Thread $s ---\"; cat $s; done"
+        stacks = subprocess.run(["sudo", "bash", "-c", cmd], capture_output=True, text=True, timeout=5)
+        print(f"[DIAG] All thread kernel stacks:\n{stacks.stdout}")
     except Exception as e:
-        print(f"[DIAG] /proc/stack read failed: {e}")
+        print(f"[DIAG] sudo thread stacks failed: {e}")
 
     try:
-        task_dir = f"/proc/{pid}/task"
-        if os.path.isdir(task_dir):
-            threads = os.listdir(task_dir)
-            print(f"[DIAG] Threads found ({len(threads)}): {threads}")
-            for tid in threads[:5]:
-                t_stack = f"/proc/{pid}/task/{tid}/stack"
-                if os.path.isfile(t_stack):
-                    with open(t_stack, "r") as f:
-                        content = f.read().strip()
-                        if content:
-                            print(f"[DIAG] Thread {tid} stack:\n{content}")
-    except Exception as e:
-        print(f"[DIAG] thread stacks failed: {e}")
-
-    try:
-        fd_out = subprocess.run(["ls", "-l", f"/proc/{pid}/fd"], capture_output=True, text=True, timeout=5)
+        # Check open file descriptors
+        fd_out = subprocess.run(["sudo", "ls", "-l", f"/proc/{pid}/fd"], capture_output=True, text=True, timeout=5)
         print(f"[DIAG] Open file descriptors:\n{fd_out.stdout}")
     except Exception as e:
         print(f"[DIAG] ls fd failed: {e}")
 
     try:
-        print(f"[DIAG] Running 1s strace sample on PID {pid}...")
-        strace_cmd = ["strace", "-p", str(pid), "-s", "256"]
+        print(f"[DIAG] Running 2s sudo strace sample on PID {pid}...")
+        strace_cmd = ["sudo", "strace", "-p", str(pid), "-s", "256"]
         s_proc = subprocess.Popen(strace_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-        time.sleep(1.5)
+        time.sleep(2.0)
         s_proc.terminate()
         try:
             out, _ = s_proc.communicate(timeout=2)
-            print(f"[DIAG] strace sample:\n{out[:2000]}")
+            print(f"[DIAG] strace sample:\n{out[:3000]}")
         except Exception:
             s_proc.kill()
     except Exception as e:
-        print(f"[DIAG] strace failed: {e}")
+        print(f"[DIAG] sudo strace failed: {e}")
 
 
 def main():
@@ -105,32 +116,51 @@ def main():
     board_dir = os.path.dirname(script_dir)
     renode = find_renode()
 
+    if sys.platform.startswith("linux"):
+        print_environment_layout()
+
     elf_path = os.path.join(board_dir, "build", "app", "demos", "threadx_basic", "mimxrt1064_threadx.elf")
     if not os.path.isfile(elf_path):
         elf_path = os.path.join(board_dir, "build", "mimxrt1064_threadx.elf")
 
     elf_rel = os.path.relpath(elf_path, board_dir).replace("\\", "/")
 
+    # Isolated test suite
     script_commands = [
-        "log '=== DIAG STEP 1: CREATING MACHINE ==='",
+        # TEST A: Built-in CPU description
+        "log '=== [TEST A] CREATING TEST MACHINE FOR CPU REPL ==='",
+        "mach create 'test-cpu'",
+        "log '=== [TEST A] LOADING @platforms/cpus/imxrt1064.repl ==='",
+        "machine LoadPlatformDescription @platforms/cpus/imxrt1064.repl",
+        "log '=== [TEST A SUCCESS] CPU REPL LOADED OK ==='",
+        "mach clear",
+
+        # TEST B: Built-in Board description
+        "log '=== [TEST B] CREATING TEST MACHINE FOR BOARD REPL ==='",
+        "mach create 'test-board'",
+        "log '=== [TEST B] LOADING @platforms/boards/mimxrt1064_evk.repl ==='",
+        "machine LoadPlatformDescription @platforms/boards/mimxrt1064_evk.repl",
+        "log '=== [TEST B SUCCESS] BOARD REPL LOADED OK ==='",
+        "mach clear",
+
+        # TEST C: Custom Platform description
+        "log '=== [TEST C] CREATING PRODUCTION MACHINE ==='",
         "mach create 'mimxrt1064-evk'",
-        "log '=== DIAG STEP 2: MACHINE CREATED OK ==='",
-        "log '=== DIAG STEP 3: LOADING PLATFORM DESCRIPTION ==='",
+        "log '=== [TEST C] LOADING @renode/mimxrt1064-evk.repl ==='",
         "machine LoadPlatformDescription @renode/mimxrt1064-evk.repl",
-        "log '=== DIAG STEP 4: PLATFORM LOADED OK ==='",
-        "log '=== DIAG STEP 5: CONFIGURING SHOWANALYZER ==='",
+        "log '=== [TEST C SUCCESS] CUSTOM REPL LOADED OK ==='",
+
+        # Verification run
+        "log '=== [TEST D] CONFIGURING SHOWANALYZER ==='",
         "showAnalyzer sysbus.lpuart1",
-        "log '=== DIAG STEP 6: SHOWANALYZER CONFIGURED OK ==='",
-        f"log '=== DIAG STEP 7: LOADING ELF ({elf_rel}) ==='",
+        f"log '=== [TEST D] LOADING ELF ({elf_rel}) ==='",
         f"sysbus LoadELF @{elf_rel}",
-        "log '=== DIAG STEP 8: ELF LOADED OK ==='",
-        "log '=== DIAG STEP 9: SETTING VTOR AND REGISTERS ==='",
         "cpu VectorTableOffset 0x70002000",
         "cpu PC `sysbus ReadDoubleWord 0x70002004`",
         "cpu SP `sysbus ReadDoubleWord 0x70002000`",
-        "log '=== DIAG STEP 10: STARTING EMULATION FOR 2 SECONDS ==='",
+        "log '=== [TEST D] RUNNING EMULATION FOR 2s ==='",
         "emulation RunFor '2'",
-        "log '=== DIAG STEP 11: EMULATION FINISHED OK ==='",
+        "log '=== [TEST D SUCCESS] ALL TESTS PASSED! ==='",
         "quit",
     ]
 
@@ -172,7 +202,7 @@ def main():
     start_time = time.time()
     hang_detected = False
     inactivity_timeout = 15.0
-    overall_timeout = 60.0
+    overall_timeout = 90.0
 
     while True:
         try:
