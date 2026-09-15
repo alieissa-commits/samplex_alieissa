@@ -407,9 +407,9 @@ jobs:
           echo "=== Python Version ==="
           python3 --version
 
-      - name: Start Interactive Live Debug Session (tmate)
-        uses: mxschmitt/action-tmate@v3
-        timeout-minutes: 20
+      - name: Run Granular Step-by-Step Diagnostic Test
+        run: |
+          python3 NXP/MIMXRT1064-EVK/scripts/ci_diagnose.py
 
       - name: Run Deterministic Headless Renode Test (threadx_basic)
         run: |
