@@ -11,6 +11,9 @@
 using "platforms/boards/mimxrt1064_evk.repl"
 
 // User LED D18 (Green, active low, connected to GPIO1 Pin 9)
+gpio1:
+    9 -> user_led@0
+
 user_led: Miscellaneous.LED @ gpio1 9
     invert: true
 
