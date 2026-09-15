@@ -407,9 +407,6 @@ jobs:
           echo "=== Python Version ==="
           python3 --version
 
-      - name: Run Granular Step-by-Step Diagnostic Test
-        run: |
-          python3 NXP/MIMXRT1064-EVK/scripts/ci_diagnose.py
 
       - name: Run Deterministic Headless Renode Test (threadx_basic)
         run: |
