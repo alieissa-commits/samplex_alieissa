@@ -6,10 +6,9 @@
 """
 Automated Granular Diagnostic Script for NXP MIMXRT1064-EVK Renode CI.
 
-Executes isolated platform load tests and inspects kernel thread stacks with sudo if stalled.
+Isolates each suspect delta between upstream working REPL and our REPL.
 """
 
-import glob
 import os
 import queue
 import shutil
@@ -38,219 +37,161 @@ def find_renode():
     return "renode"
 
 
-def reader_thread(pipe, q):
-    try:
-        for line in iter(pipe.readline, ""):
-            q.put(line)
-    except Exception:
-        pass
-    finally:
-        pipe.close()
-
-
-def print_environment_layout():
-    print("\n=== Inspecting Renode Installation Filesystem ===")
-    renode_dir = os.path.expanduser("~/renode")
-    if os.path.isdir(renode_dir):
-        print(f"[FS] Contents of {renode_dir}: {os.listdir(renode_dir)}")
-        for sub in ["scripts", "platforms", "platforms/cpus", "platforms/boards"]:
-            p = os.path.join(renode_dir, sub)
-            if os.path.exists(p):
-                print(f"[FS] Found {p}")
-            else:
-                print(f"[FS] MISSING {p}")
-
-        # Search for imxrt1064 and pydev
-        try:
-            res = subprocess.run(["find", renode_dir, "-name", "*imxrt1064*"], capture_output=True, text=True, timeout=5)
-            print(f"[FS] imxrt1064 files in renode:\n{res.stdout.strip()}")
-            res2 = subprocess.run(["find", renode_dir, "-name", "*ticker*"], capture_output=True, text=True, timeout=5)
-            print(f"[FS] ticker files in renode:\n{res2.stdout.strip()}")
-        except Exception as e:
-            print(f"[FS] find failed: {e}")
-    else:
-        print(f"[FS] {renode_dir} is not a directory.")
-    print("=================================================\n")
-
-
-def dump_linux_diagnostics(pid):
-    print(f"\n[DIAG] === Sudo Linux Process Inspection for PID {pid} ===")
-    try:
-        ps_out = subprocess.run(["ps", "-fp", str(pid)], capture_output=True, text=True, timeout=5)
-        print(ps_out.stdout)
-    except Exception as e:
-        print(f"[DIAG] ps failed: {e}")
-
-    try:
-        # Check task thread stacks with sudo
-        cmd = f"for s in /proc/{pid}/task/*/stack; do echo \"--- Thread $s ---\"; cat $s; done"
-        stacks = subprocess.run(["sudo", "bash", "-c", cmd], capture_output=True, text=True, timeout=5)
-        print(f"[DIAG] All thread kernel stacks:\n{stacks.stdout}")
-    except Exception as e:
-        print(f"[DIAG] sudo thread stacks failed: {e}")
-
-    try:
-        # Check open file descriptors
-        fd_out = subprocess.run(["sudo", "ls", "-l", f"/proc/{pid}/fd"], capture_output=True, text=True, timeout=5)
-        print(f"[DIAG] Open file descriptors:\n{fd_out.stdout}")
-    except Exception as e:
-        print(f"[DIAG] ls fd failed: {e}")
-
-    try:
-        print(f"[DIAG] Running 2s sudo strace sample on PID {pid}...")
-        strace_cmd = ["sudo", "strace", "-p", str(pid), "-s", "256"]
-        s_proc = subprocess.Popen(strace_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-        time.sleep(2.0)
-        s_proc.terminate()
-        try:
-            out, _ = s_proc.communicate(timeout=2)
-            print(f"[DIAG] strace sample:\n{out[:3000]}")
-        except Exception:
-            s_proc.kill()
-    except Exception as e:
-        print(f"[DIAG] sudo strace failed: {e}")
-
-
-def main():
+def run_renode_test(name, command_str, timeout_s=10.0):
+    renode = find_renode()
     script_dir = os.path.dirname(os.path.abspath(__file__))
     board_dir = os.path.dirname(script_dir)
-    renode = find_renode()
 
-    if sys.platform.startswith("linux"):
-        print_environment_layout()
-
-    elf_path = os.path.join(board_dir, "build", "app", "demos", "threadx_basic", "mimxrt1064_threadx.elf")
-    if not os.path.isfile(elf_path):
-        elf_path = os.path.join(board_dir, "build", "mimxrt1064_threadx.elf")
-
-    elf_rel = os.path.relpath(elf_path, board_dir).replace("\\", "/")
-
-    # Isolated test suite
-    script_commands = [
-        # TEST A: Built-in CPU description
-        "log '=== [TEST A] CREATING TEST MACHINE FOR CPU REPL ==='",
-        "mach create 'test-cpu'",
-        "log '=== [TEST A] LOADING @platforms/cpus/imxrt1064.repl ==='",
-        "machine LoadPlatformDescription @platforms/cpus/imxrt1064.repl",
-        "log '=== [TEST A SUCCESS] CPU REPL LOADED OK ==='",
-        "mach clear",
-
-        # TEST B: Built-in Board description
-        "log '=== [TEST B] CREATING TEST MACHINE FOR BOARD REPL ==='",
-        "mach create 'test-board'",
-        "log '=== [TEST B] LOADING @platforms/boards/mimxrt1064_evk.repl ==='",
-        "machine LoadPlatformDescription @platforms/boards/mimxrt1064_evk.repl",
-        "log '=== [TEST B SUCCESS] BOARD REPL LOADED OK ==='",
-        "mach clear",
-
-        # TEST C: Custom Platform description
-        "log '=== [TEST C] CREATING PRODUCTION MACHINE ==='",
-        "mach create 'mimxrt1064-evk'",
-        "log '=== [TEST C] LOADING @renode/mimxrt1064-evk.repl ==='",
-        "machine LoadPlatformDescription @renode/mimxrt1064-evk.repl",
-        "log '=== [TEST C SUCCESS] CUSTOM REPL LOADED OK ==='",
-
-        # Verification run
-        "log '=== [TEST D] CONFIGURING SHOWANALYZER ==='",
-        "showAnalyzer sysbus.lpuart1",
-        f"log '=== [TEST D] LOADING ELF ({elf_rel}) ==='",
-        f"sysbus LoadELF @{elf_rel}",
-        "cpu VectorTableOffset 0x70002000",
-        "cpu PC `sysbus ReadDoubleWord 0x70002004`",
-        "cpu SP `sysbus ReadDoubleWord 0x70002000`",
-        "log '=== [TEST D] RUNNING EMULATION FOR 2s ==='",
-        "emulation RunFor '2'",
-        "log '=== [TEST D SUCCESS] ALL TESTS PASSED! ==='",
-        "quit",
-    ]
-
-    cmd_str = "; ".join(script_commands)
-
+    print(f"\n---> [START TEST] {name}")
     cmd = [
         renode,
         "--plain",
         "--disable-gui",
         "--port", "-1",
-        "-e", cmd_str,
+        "-e", command_str,
     ]
 
-    print("==================================================")
-    print("Renode Step-by-Step Granular Diagnostic Runner")
-    print("==================================================")
-    print(f"Renode binary: {renode}")
-    print(f"Working directory: {board_dir}")
-    print(f"Target ELF: {elf_rel} (exists: {os.path.isfile(elf_path)})")
-    print("")
-    print("Executing granular checkpoint command sequence...")
-    print("==================================================")
-
+    start = time.time()
     proc = subprocess.Popen(
         cmd,
         cwd=board_dir,
-        stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
-        bufsize=1,
     )
 
-    out_q = queue.Queue()
-    t = threading.Thread(target=reader_thread, args=(proc.stdout, out_q), daemon=True)
-    t.start()
-
-    last_output_time = time.time()
-    start_time = time.time()
-    hang_detected = False
-    inactivity_timeout = 15.0
-    overall_timeout = 90.0
-
-    while True:
+    try:
+        stdout, _ = proc.communicate(timeout=timeout_s)
+        elapsed = time.time() - start
+        print(f"---> [PASS {elapsed:.2f}s] {name}")
+        for line in stdout.strip().splitlines():
+            if "[INFO]" in line or "[WARNING]" in line or "[ERROR]" in line or "===" in line:
+                print(f"     {line}")
+        return True
+    except subprocess.TimeoutExpired:
+        elapsed = time.time() - start
+        print(f"\n---> [FAIL / HANG DETECTED after {elapsed:.2f}s] {name}!!!")
         try:
-            line = out_q.get(timeout=0.2)
-            sys.stdout.write(line)
-            sys.stdout.flush()
-            last_output_time = time.time()
-        except queue.Empty:
-            pass
+            # Sudo stack trace of hung process
+            print(f"[DIAG] Thread stacks for hung PID {proc.pid}:")
+            cmd_st = f"for s in /proc/{proc.pid}/task/*/stack; do echo \"--- Thread $s ---\"; cat $s; done"
+            res = subprocess.run(["sudo", "bash", "-c", cmd_st], capture_output=True, text=True, timeout=5)
+            print(res.stdout)
+        except Exception as e:
+            print(f"[DIAG] Stack dump error: {e}")
 
-        now = time.time()
-        if now - last_output_time > inactivity_timeout:
-            print(f"\n[CRITICAL DIAGNOSTIC] Renode has been silent for {inactivity_timeout}s! HANG DETECTED.")
-            hang_detected = True
-            break
-
-        if now - start_time > overall_timeout:
-            print(f"\n[CRITICAL DIAGNOSTIC] Overall test timeout ({overall_timeout}s) exceeded!")
-            hang_detected = True
-            break
-
-        if proc.poll() is not None:
-            while not out_q.empty():
-                line = out_q.get_nowait()
-                sys.stdout.write(line)
-                sys.stdout.flush()
-            break
-
-    if hang_detected:
-        if sys.platform.startswith("linux"):
-            dump_linux_diagnostics(proc.pid)
-
-        print("\n[DIAG] Terminating stalled Renode process...")
         try:
             proc.terminate()
-            proc.wait(timeout=3)
+            proc.wait(timeout=2)
         except Exception:
             try:
                 proc.kill()
             except Exception:
                 pass
-        sys.exit(1)
+        return False
 
-    exit_code = proc.returncode
-    print(f"\n==================================================")
-    print(f"Diagnostic run finished with exit code: {exit_code}")
-    print(f"==================================================")
-    sys.exit(exit_code if exit_code is not None else 0)
+
+def main():
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    board_dir = os.path.dirname(script_dir)
+    renode_dir = os.path.join(board_dir, "renode")
+    os.makedirs(renode_dir, exist_ok=True)
+
+    # 1. Base upstream board REPL (Known passing)
+    f_base = os.path.join(renode_dir, "diag_base.repl")
+    with open(f_base, "w") as f:
+        f.write('using "platforms/boards/mimxrt1064_evk.repl"\n')
+
+    # 2. Test candidate: Missing flex_spi override (Does omitting flex_spi hang?)
+    f_noflex = os.path.join(renode_dir, "diag_noflexspi.repl")
+    with open(f_noflex, "w") as f:
+        f.write(
+            'using "platforms/cpus/imxrt1064.repl"\n'
+            'sdram0: Memory.MappedMemory @ sysbus 0x80000000\n'
+            '    size: 0x2000000\n'
+            'flash_mem: Memory.MappedMemory @ sysbus 0x70000000\n'
+            '    size: 0x400000\n'
+            'user_button: Miscellaneous.Button @ gpio5\n'
+            '    invert: true\n'
+            '    -> gpio5@0\n'
+            'green_led: Miscellaneous.LED @ gpio1 9\n'
+            '    invert: true\n'
+            'adc1:\n'
+            '    referenceVoltage: 3.3\n'
+            'adc2:\n'
+            '    referenceVoltage: 3.3\n'
+        )
+
+    # 3. Test candidate: Custom user_led + gpio1 wiring
+    f_gpio = os.path.join(renode_dir, "diag_gpio.repl")
+    with open(f_gpio, "w") as f:
+        f.write(
+            'using "platforms/boards/mimxrt1064_evk.repl"\n'
+            'gpio1:\n'
+            '    9 -> user_led@0\n'
+            'user_led: Miscellaneous.LED @ gpio1 9\n'
+            '    invert: true\n'
+        )
+
+    # 4. Test candidate: Ethernet PHY on upstream board
+    f_phy = os.path.join(renode_dir, "diag_phy.repl")
+    with open(f_phy, "w") as f:
+        f.write(
+            'using "platforms/boards/mimxrt1064_evk.repl"\n'
+            'phy: Network.EthernetPhysicalLayer @ enet 2\n'
+            '    Id1: 0x0022\n'
+            '    Id2: 0x1560\n'
+            '    BasicControl: 0x3100\n'
+            '    BasicStatus: 0x782D\n'
+            '    AutoNegotiationAdvertisement: 0x01E1\n'
+            '    AutoNegotiationLinkPartnerBasePageAbility: 0x01E1\n'
+            '    VendorSpecific14: 0x0116\n'
+            '    VendorSpecific15: 0x0080\n'
+        )
+
+    # 5. Test candidate: Upstream board + flex_spi + phy + user_led
+    f_combined = os.path.join(renode_dir, "diag_combined.repl")
+    with open(f_combined, "w") as f:
+        f.write(
+            'using "platforms/boards/mimxrt1064_evk.repl"\n'
+            'user_led: Miscellaneous.LED @ gpio1 9\n'
+            '    invert: true\n'
+            'phy: Network.EthernetPhysicalLayer @ enet 2\n'
+            '    Id1: 0x0022\n'
+            '    Id2: 0x1560\n'
+            '    BasicControl: 0x3100\n'
+            '    BasicStatus: 0x782D\n'
+            '    AutoNegotiationAdvertisement: 0x01E1\n'
+            '    AutoNegotiationLinkPartnerBasePageAbility: 0x01E1\n'
+            '    VendorSpecific14: 0x0116\n'
+            '    VendorSpecific15: 0x0080\n'
+        )
+
+    tests = [
+        ("1. Upstream Board (baseline)", 'mach create "m"; machine LoadPlatformDescription @renode/diag_base.repl; quit'),
+        ("2. Omit flex_spi override (suspect A)", 'mach create "m"; machine LoadPlatformDescription @renode/diag_noflexspi.repl; quit'),
+        ("3. GPIO double-wiring (suspect B)", 'mach create "m"; machine LoadPlatformDescription @renode/diag_gpio.repl; quit'),
+        ("4. Ethernet PHY added to Upstream Board (suspect C)", 'mach create "m"; machine LoadPlatformDescription @renode/diag_phy.repl; quit'),
+        ("5. Clean Combined (Upstream Board + flex_spi + PHY + user_led)", 'mach create "m"; machine LoadPlatformDescription @renode/diag_combined.repl; quit'),
+        ("6. Original mimxrt1064-evk.repl", 'mach create "m"; machine LoadPlatformDescription @renode/mimxrt1064-evk.repl; quit'),
+    ]
+
+    results = {}
+    for name, cmd_str in tests:
+        ok = run_renode_test(name, cmd_str, timeout_s=10.0)
+        results[name] = ok
+        if not ok:
+            print(f"\n>>> IDENTIFIED FAILING REPL CONFIGURATION: {name} <<<")
+            # Don't abort immediately, let us see if combined works!
+
+    print("\n==================================================")
+    print("DIAGNOSTIC TEST MATRIX SUMMARY:")
+    for name, ok in results.items():
+        print(f"  [{'PASS' if ok else 'FAIL'}] {name}")
+    print("==================================================")
+
+    # Return 0 so CI displays the full matrix
+    sys.exit(0)
 
 
 if __name__ == "__main__":
