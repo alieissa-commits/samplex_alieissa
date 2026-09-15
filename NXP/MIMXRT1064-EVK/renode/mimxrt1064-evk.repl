@@ -8,20 +8,7 @@
 //
 // Platform description for NXP i.MX RT1064-EVK (Simulated in Renode).
 
-using "platforms/cpus/imxrt1064.repl"
-
-// External SDRAM (32 MB @ 0x80000000)
-sdram0: Memory.MappedMemory @ sysbus 0x80000000
-    size: 0x2000000
-
-// External/On-chip FlexSPI NOR Flash (4 MB @ 0x70000000)
-flash_mem: Memory.MappedMemory @ sysbus 0x70000000
-    size: 0x400000
-
-// User Button SW8 (WAKEUP, active low, connected to GPIO5 Pin 0)
-user_button: Miscellaneous.Button @ gpio5
-    invert: true
-    -> gpio5@0
+using "platforms/boards/mimxrt1064_evk.repl"
 
 // User LED D18 (Green, active low, connected to GPIO1 Pin 9)
 gpio1:
@@ -29,13 +16,6 @@ gpio1:
 
 user_led: Miscellaneous.LED @ gpio1 9
     invert: true
-
-// On-chip ADCs
-adc1:
-    referenceVoltage: 3.3
-
-adc2:
-    referenceVoltage: 3.3
 
 // Ethernet Physical Layer (KSZ8081 PHY at address 2 on enet)
 phy: Network.EthernetPhysicalLayer @ enet 2
