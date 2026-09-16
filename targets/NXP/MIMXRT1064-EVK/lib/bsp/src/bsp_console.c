@@ -13,13 +13,17 @@
 
 #include "fsl_lpuart.h"
 #include "board.h"
+#include "tx_api.h"
 
+#include <stdio.h>
 #include <stddef.h>
 #include <stdint.h>
 
 #if BSP_HAS_CONSOLE
 static bsp_console_rx_fn volatile console_rx_handler = NULL;
 static void *volatile console_rx_context = NULL;
+static TX_MUTEX s_console_mutex;
+static volatile int s_console_mutex_created = 0;
 
 static void console_putc(char c)
 {
@@ -50,6 +54,11 @@ void bsp_console_init(void)
 
     uint32_t uartClkSrcFreq = BOARD_DebugConsoleSrcFreq();
     LPUART_Init(LPUART1, &config, uartClkSrcFreq);
+
+    /* Set stdout and stderr to unbuffered mode so newlib printf never
+     * allocates dynamic heap buffers during multi-threaded execution. */
+    setvbuf(stdout, NULL, _IONBF, 0);
+    setvbuf(stderr, NULL, _IONBF, 0);
 #endif
 }
 
@@ -61,9 +70,41 @@ void bsp_console_write(const char *data, size_t length)
         return;
     }
 
+    int locked = 0;
+    /* Only acquire mutex if ThreadX is running, in thread mode, and not inside an ISR */
+    if ((__get_IPSR() == 0U) && (tx_thread_identify() != TX_NULL))
+    {
+        if (!s_console_mutex_created)
+        {
+            TX_INTERRUPT_SAVE_AREA
+            TX_DISABLE
+            if (!s_console_mutex_created)
+            {
+                if (tx_mutex_create(&s_console_mutex, "Console Mutex", TX_NO_INHERIT) == TX_SUCCESS)
+                {
+                    s_console_mutex_created = 1;
+                }
+            }
+            TX_RESTORE
+        }
+
+        if (s_console_mutex_created)
+        {
+            if (tx_mutex_get(&s_console_mutex, TX_WAIT_FOREVER) == TX_SUCCESS)
+            {
+                locked = 1;
+            }
+        }
+    }
+
     for (size_t i = 0U; i < length; i++)
     {
         console_putc(data[i]);
+    }
+
+    if (locked)
+    {
+        tx_mutex_put(&s_console_mutex);
     }
 #else
     (void)data;
