@@ -32,7 +32,6 @@ New-Item -ItemType Directory -Path $DeviceDir -Force | Out-Null
 New-Item -ItemType Directory -Path $DriversDir -Force | Out-Null
 New-Item -ItemType Directory -Path $UtilitiesDir -Force | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $ComponentsDir "uart") -Force | Out-Null
-New-Item -ItemType Directory -Path (Join-Path $ComponentsDir "phy") -Force | Out-Null
 New-Item -ItemType Directory -Path $BoardFilesDir -Force | Out-Null
 New-Item -ItemType Directory -Path $CmsisIncludeDest -Force | Out-Null
 $AppStartupDir = Join-Path $BoardDir "app/startup"
@@ -217,29 +216,11 @@ try {
     Write-Host "[OK] CMSIS Core headers copied"
     Write-Host ""
 
-    # 4. Fetch official NXP KSZ8081 PHY driver (pinned to commit 37ff82f7 from eclipse-threadx/getting-started)
-    $threadxGsCommit = "37ff82f757070f3fa5364acb1ac06fcc7a5b9d38"
-    $phyRawBase = "https://raw.githubusercontent.com/eclipse-threadx/getting-started/$threadxGsCommit/NXP/MIMXRT1060-EVK/lib/MIMXRT1060-evk/src/components/phyksz8081"
-    Write-Host "[INFO] Downloading official KSZ8081 PHY driver (pinned: $($threadxGsCommit.Substring(0,8)))..."
-    Download-WithRetry -Uri "$phyRawBase/fsl_phy.c" -OutFile (Join-Path $ComponentsDir "phy/fsl_phy.c") -ExpectedHash "e3713b2b9a1a5f3f1f1680f966b3f9ee7d7ebbdaf0ce65bc9316aeb687239dfa"
-    Download-WithRetry -Uri "$phyRawBase/fsl_phy.h" -OutFile (Join-Path $ComponentsDir "phy/fsl_phy.h") -ExpectedHash "250400673cc0017ca4d67f9bc7547146bafb49c39449b6e5e615ef7be249764d"
-    Write-Host "[OK] Stock KSZ8081 PHY driver verified & downloaded"
-    Write-Host ""
-
-    # 5. Fetch official NetX Duo NXP Ethernet driver (pinned to commit 37ff82f7 from eclipse-threadx/getting-started)
-    $netxRawBase = "https://raw.githubusercontent.com/eclipse-threadx/getting-started/$threadxGsCommit/NXP/MIMXRT1060-EVK/lib/netx_driver"
-    $netxDriverDestDir = Join-Path $DriversDir "netx_driver"
-    $netxDriverGnuDir = Join-Path $netxDriverDestDir "gnu"
-    New-Item -ItemType Directory -Path $netxDriverGnuDir -Force | Out-Null
-    Write-Host "[INFO] Downloading official NetX Duo NXP Ethernet driver (pinned: $($threadxGsCommit.Substring(0,8)))..."
-    Download-WithRetry -Uri "$netxRawBase/src/nx_driver_imxrt1062.c" -OutFile (Join-Path $netxDriverDestDir "nx_driver_imxrt1062.c") -ExpectedHash "eecb7f8df7a767e8361df220cb65b8af9c49311bfb67f34099a916cc804587b1"
-    Download-WithRetry -Uri "$netxRawBase/src/nx_driver_imxrt1062.h" -OutFile (Join-Path $netxDriverDestDir "nx_driver_imxrt1062.h") -ExpectedHash "ab547be6957267986b30f1385f9c6832b0ea2acf17bf96a90a5e03cbd68a934f"
-    Download-WithRetry -Uri "$netxRawBase/src/gnu/nx_driver_imxrt1062_low_level.S" -OutFile (Join-Path $netxDriverGnuDir "nx_driver_imxrt1062_low_level.S") -ExpectedHash "6a60ce95bacd35754622c4c9f8c18d06ebb668545dcdf43d996945d44097b306"
-    Write-Host "[OK] Stock NetX Duo NXP Ethernet driver verified & downloaded"
+    Write-Host "[INFO] Note: NetX Duo Ethernet driver and KSZ8081 PHY driver are vendored in lib/netx_driver and lib/phyksz8081."
     Write-Host ""
 
     Write-Host "=========================================="
-    Write-Host "[SUCCESS] NXP i.MX RT1064 drivers successfully fetched & verified!"
+    Write-Host "[SUCCESS] NXP i.MX RT1064 SDK dependencies successfully fetched & verified!"
     Write-Host "=========================================="
 }
 finally {

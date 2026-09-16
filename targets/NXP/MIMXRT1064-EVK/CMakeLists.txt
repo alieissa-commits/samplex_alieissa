@@ -113,9 +113,9 @@ add_subdirectory(lib/bsp)
 
 # 2. Define NetX Duo driver library targets (cached for networking demos)
 add_library(netx_imxrt_driver OBJECT
-        ${SDK_DIR}/drivers/netx_driver/nx_driver_imxrt1062.c
-        ${SDK_DIR}/drivers/netx_driver/gnu/nx_driver_imxrt1062_low_level.S
-        ${SDK_DIR}/components/phy/fsl_phy.c
+        ${CMAKE_CURRENT_LIST_DIR}/lib/netx_driver/nx_driver_imxrt1062.c
+        ${CMAKE_CURRENT_LIST_DIR}/lib/netx_driver/gnu/nx_driver_imxrt1062_low_level.S
+        ${CMAKE_CURRENT_LIST_DIR}/lib/phyksz8081/fsl_phy.c
         ${SDK_DIR}/drivers/fsl_enet.c
     )
 
@@ -133,8 +133,8 @@ add_library(netx_imxrt_driver OBJECT
 
     target_include_directories(netx_imxrt_driver
         PUBLIC
-            ${SDK_DIR}/drivers/netx_driver
-            ${SDK_DIR}/components/phy
+            ${CMAKE_CURRENT_LIST_DIR}/lib/netx_driver
+            ${CMAKE_CURRENT_LIST_DIR}/lib/phyksz8081
             ${CMAKE_CURRENT_LIST_DIR}/app
             ${CMAKE_CURRENT_LIST_DIR}/lib/netxduo
             ${SDK_DIR}/CMSIS/Include
@@ -155,9 +155,9 @@ add_library(netx_imxrt_driver OBJECT
     target_compile_options(netx_imxrt_driver PRIVATE -Wno-unused-variable)
 
     add_library(netx_imxrt_driver_client OBJECT
-        ${SDK_DIR}/drivers/netx_driver/nx_driver_imxrt1062.c
-        ${SDK_DIR}/drivers/netx_driver/gnu/nx_driver_imxrt1062_low_level.S
-        ${SDK_DIR}/components/phy/fsl_phy.c
+        ${CMAKE_CURRENT_LIST_DIR}/lib/netx_driver/nx_driver_imxrt1062.c
+        ${CMAKE_CURRENT_LIST_DIR}/lib/netx_driver/gnu/nx_driver_imxrt1062_low_level.S
+        ${CMAKE_CURRENT_LIST_DIR}/lib/phyksz8081/fsl_phy.c
         ${SDK_DIR}/drivers/fsl_enet.c
     )
 
@@ -176,8 +176,8 @@ add_library(netx_imxrt_driver OBJECT
 
     target_include_directories(netx_imxrt_driver_client
         PUBLIC
-            ${SDK_DIR}/drivers/netx_driver
-            ${SDK_DIR}/components/phy
+            ${CMAKE_CURRENT_LIST_DIR}/lib/netx_driver
+            ${CMAKE_CURRENT_LIST_DIR}/lib/phyksz8081
             ${CMAKE_CURRENT_LIST_DIR}/app
             ${CMAKE_CURRENT_LIST_DIR}/lib/netxduo
             ${SDK_DIR}/CMSIS/Include
