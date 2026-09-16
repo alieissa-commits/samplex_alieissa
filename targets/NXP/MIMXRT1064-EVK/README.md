@@ -2,7 +2,8 @@
 
 Welcome to the board enablement package for running **Eclipse ThreadX RTOS** and **NetX Duo** on the high-performance **NXP i.MX RT1064-EVK** (ARM Cortex-M7 @ 600 MHz).
 
-This target provides ready-to-run demos ranging from fundamental task scheduling and GPIO blinking to full multi-node TCP/IP networking and on-chip hardware cryptographic entropy (TRNG) — testable on physical hardware or immediately on your workstation using **Antmicro Renode** system simulation.
+This target provides ready demos ranging from fundamental task scheduling and GPIO blinking to full multi-node TCP/IP networking and on-chip hardware cryptographic entropy.
+The demos are testable on physical hardware or immediately on your workstation using **Antmicro Renode** system simulation.
 
 ---
 
@@ -23,16 +24,16 @@ Download the official NXP MCUXpresso SDK drivers and build all demos:
 
 * **Windows (PowerShell)**:
   ```powershell
-  # 1. Fetch NXP SDK peripheral drivers and CMSIS headers (verified with SHA-256)
+  # 1. Fetch NXP SDK peripheral drivers and CMSIS headers
   powershell -ExecutionPolicy Bypass -File .\scripts\fetch_sdk.ps1
 
-  # 2. Build all demos (produces both single-node and multi-node ELF binaries)
+  # 2. Build all demos
   powershell -ExecutionPolicy Bypass -File .\scripts\build.ps1
   ```
 
 * **Linux / macOS (Bash)**:
   ```bash
-  # 1. Fetch NXP SDK peripheral drivers and CMSIS headers (verified with SHA-256)
+  # 1. Fetch NXP SDK peripheral drivers and CMSIS headers
   chmod +x ./scripts/*.sh
   ./scripts/fetch_sdk.sh
 
@@ -65,7 +66,7 @@ The build system can compile all demos together (default) or individual demos on
 
 > [!NOTE]
 > **How Multi-Node Verification Works**:
-> In `netx_echo` and `netx_trng_console`, Renode boots **two independent virtual i.MX RT1064 machines** interconnected via a simulated Ethernet switch. The **server** node runs ThreadX services, while the **client** node runs an automated test suite that transmits network traffic, asserts on responses, and validates cryptographic entropy.
+> In `netx_echo` and `netx_trng_console`, Renode boots **two independent virtual i.MX RT1064 machines** interconnected via a simulated Ethernet switch. The **server** node runs ThreadX services, while the **client** node runs an automated test suite that transmits network traffic.
 
 ---
 
@@ -86,23 +87,23 @@ Launch Renode with virtual serial terminal windows attached to the microcontroll
 
   # Hardware TRNG Diagnostic Console (multi-node server + client)
   powershell -ExecutionPolicy Bypass -File .\scripts\simulate.ps1 -Demo netx_trng_console
+  # You can specify a pseudo-random seed for reproducible test runs
+  powershell -ExecutionPolicy Bypass -File .\scripts\simulate.ps1 -Demo netx_trng_console -Seed 12345
   ```
 
 * **Linux / macOS (Bash)**:
   ```bash
+  # ThreadX Core Basic (single node)
   ./scripts/simulate.sh -d threadx_basic
-  ./scripts/simulate.sh -d netx_echo
-  ./scripts/simulate.sh -d netx_trng_console
-  ```
 
-#### Deterministic Execution with Random Seeds:
-To ensure reproducible test runs, you can specify a pseudo-random seed. For example, seed `12345` produces a verified, deterministic hardware entropy sequence:
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\simulate.ps1 -Demo netx_trng_console -Seed 12345
-```
-```bash
-./scripts/simulate.sh -d netx_trng_console -s 12345
-```
+  # NetX Duo Network Echo (multi-node server + client)
+  ./scripts/simulate.sh -d netx_echo
+
+  # Hardware TRNG Diagnostic Console (multi-node server + client)
+  ./scripts/simulate.sh -d netx_trng_console
+  # You can specify a pseudo-random seed for reproducible test runs
+  ./scripts/simulate.sh -d netx_trng_console -s 12345
+  ```
 
 ### 2. Headless Automated Regression Testing (CI/CD)
 Headless testing is designed for automated continuous integration pipelines. The runner boots the simulation, monitors the virtual UART logs, and exits with code `0` on success or code `1` on failure/timeout.
