@@ -31,6 +31,7 @@ New-Item -ItemType Directory -Path $DeviceDir -Force | Out-Null
 New-Item -ItemType Directory -Path $DriversDir -Force | Out-Null
 New-Item -ItemType Directory -Path $UtilitiesDir -Force | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $ComponentsDir "uart") -Force | Out-Null
+New-Item -ItemType Directory -Path (Join-Path $ComponentsDir "phy") -Force | Out-Null
 New-Item -ItemType Directory -Path $BoardFilesDir -Force | Out-Null
 New-Item -ItemType Directory -Path $CmsisIncludeDest -Force | Out-Null
 $AppStartupDir = Join-Path $BoardDir "app/startup"
@@ -45,15 +46,33 @@ function Clean-Temp {
     }
 }
 
+function Verify-Sha256 {
+    param(
+        [string]$FilePath,
+        [string]$ExpectedHash
+    )
+    $actualHash = (Get-FileHash -Path $FilePath -Algorithm SHA256).Hash.ToLower()
+    if ($actualHash -ne $ExpectedHash.ToLower()) {
+        throw "SHA256 checksum mismatch for $FilePath! Expected: $ExpectedHash, Got: $actualHash"
+    }
+}
+
 try {
-    # 1. Download official NXP MIMXRT1064 DFP pack from NXP repository
+    # 1. Download official NXP MIMXRT1064 DFP pack from NXP repository (pinned v15.1.0)
     $packUrl = "https://mcuxpresso.nxp.com/cmsis_pack/repo/NXP.MIMXRT1064_DFP.15.1.0.pack"
+    $packSha256 = "14e02f0108beba1cfe9de6b2be7b1f874695614dcc16126c452bde1b68b509f6"
     $packZip = Join-Path $TempDir "dfp.zip"
     $packExtract = Join-Path $TempDir "dfp_extracted"
 
-    Write-Host "[INFO] Downloading official NXP MIMXRT1064 Device Pack..."
+    Write-Host "[INFO] Downloading official NXP MIMXRT1064 Device Pack (v15.1.0)..."
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-    Invoke-WebRequest -Uri $packUrl -OutFile $packZip -UseBasicParsing
+    if (Get-Command curl.exe -ErrorAction SilentlyContinue) {
+        & curl.exe --retry 3 --retry-delay 2 -fsSL $packUrl -o $packZip
+    } else {
+        Invoke-WebRequest -Uri $packUrl -OutFile $packZip -UseBasicParsing
+    }
+    Verify-Sha256 -FilePath $packZip -ExpectedHash $packSha256
+    Write-Host "[OK] NXP Device Pack verified (SHA256: $packSha256)"
 
     Write-Host "[INFO] Extracting Device Pack..."
     Expand-Archive -Path $packZip -DestinationPath $packExtract -Force
@@ -127,18 +146,29 @@ try {
     Write-Host "[OK] NXP Device, Driver, Utility, and Component files copied"
     Write-Host ""
 
-    # Helper function to download with retries for GitHub CDN resilience
+    # Helper function to download with retries and SHA256 checksum verification
     function Download-WithRetry {
-        param([string]$Uri, [string]$OutFile, [int]$MaxAttempts = 4)
+        param(
+            [string]$Uri,
+            [string]$OutFile,
+            [string]$ExpectedHash = "",
+            [int]$MaxAttempts = 4
+        )
         for ($i = 1; $i -le $MaxAttempts; $i++) {
             try {
                 if (Get-Command curl.exe -ErrorAction SilentlyContinue) {
                     & curl.exe --retry 3 --retry-delay 2 -fsSL $Uri -o $OutFile
                     if ($LASTEXITCODE -eq 0 -and (Test-Path $OutFile) -and ((Get-Item $OutFile).Length -gt 0)) {
+                        if ($ExpectedHash) {
+                            Verify-Sha256 -FilePath $OutFile -ExpectedHash $ExpectedHash
+                        }
                         return
                     }
                 }
                 Invoke-WebRequest -Uri $Uri -OutFile $OutFile -UseBasicParsing -TimeoutSec 30
+                if ($ExpectedHash) {
+                    Verify-Sha256 -FilePath $OutFile -ExpectedHash $ExpectedHash
+                }
                 return
             }
             catch {
@@ -148,25 +178,26 @@ try {
         }
     }
 
-    # 2. Download EVK-MIMXRT1064 Board Initialization Files from official NXP mcuxsdk-examples
-    $rawBase = "https://raw.githubusercontent.com/nxp-mcuxpresso/mcuxsdk-examples/main/_boards/evkmimxrt1064"
+    # 2. Download EVK-MIMXRT1064 Board Support Files (pinned to commit 2a340e10 from nxp-mcuxpresso/mcuxsdk-examples)
+    $mcuxExamplesCommit = "2a340e10a1105bc0af8e7176bc19148911f4cf12"
+    $rawBase = "https://raw.githubusercontent.com/nxp-mcuxpresso/mcuxsdk-examples/$mcuxExamplesCommit/_boards/evkmimxrt1064"
     $boardFiles = @(
-        @{ Remote = "$rawBase/board.c"; Local = "board.c" },
-        @{ Remote = "$rawBase/board.h"; Local = "board.h" },
-        @{ Remote = "$rawBase/project_template/clock_config.c"; Local = "clock_config.c" },
-        @{ Remote = "$rawBase/project_template/clock_config.h"; Local = "clock_config.h" },
-        @{ Remote = "$rawBase/project_template/pin_mux.c"; Local = "pin_mux.c" },
-        @{ Remote = "$rawBase/project_template/pin_mux.h"; Local = "pin_mux.h" },
-        @{ Remote = "$rawBase/dcd.c"; Local = "dcd.c" },
-        @{ Remote = "$rawBase/dcd.h"; Local = "dcd.h" },
-        @{ Remote = "$rawBase/xip/evkmimxrt1064_flexspi_nor_config.c"; Local = "evkmimxrt1064_flexspi_nor_config.c" },
-        @{ Remote = "$rawBase/xip/evkmimxrt1064_flexspi_nor_config.h"; Local = "evkmimxrt1064_flexspi_nor_config.h" }
+        @{ Remote = "$rawBase/board.c"; Local = "board.c"; Hash = "f28885b9ac349a06a6b38f0376f6872a25ec131ab7d37947a0576255579cd959" },
+        @{ Remote = "$rawBase/board.h"; Local = "board.h"; Hash = "9c25debd61b7fc153eeedd569155dfc8f9d1349192c6de2b431742ee6f9bb17e" },
+        @{ Remote = "$rawBase/project_template/clock_config.c"; Local = "clock_config.c"; Hash = "ca20b253229ef02e74a9d0041173c5e1fc0c5c3df048a53be8b44e1e4218ef03" },
+        @{ Remote = "$rawBase/project_template/clock_config.h"; Local = "clock_config.h"; Hash = "52036470ef08b16daf7ed1382a8c3c0bcc123336afc2b07df807e793365b3e80" },
+        @{ Remote = "$rawBase/project_template/pin_mux.c"; Local = "pin_mux.c"; Hash = "4bf784e2685555e6297adccb78a27de5754e5320911bc503b5ab563577599c39" },
+        @{ Remote = "$rawBase/project_template/pin_mux.h"; Local = "pin_mux.h"; Hash = "f696267090a271e12d9c9f3ccb0e2dfb721025ddd3728b32ab33a9fb79acbc70" },
+        @{ Remote = "$rawBase/dcd.c"; Local = "dcd.c"; Hash = "798cd3fffea9b3b1917d6750d40735b6bc890e770f8d8b9167238220b0fae21f" },
+        @{ Remote = "$rawBase/dcd.h"; Local = "dcd.h"; Hash = "3a5268f0ccdc02aa6df55b3fca87171df35161cca0c3e15971ac082cdefde7a3" },
+        @{ Remote = "$rawBase/xip/evkmimxrt1064_flexspi_nor_config.c"; Local = "evkmimxrt1064_flexspi_nor_config.c"; Hash = "f6fa3d1e3a09c1a4a9d3fc44aed23513e12341e6db96aa3427c923e6b41c6e46" },
+        @{ Remote = "$rawBase/xip/evkmimxrt1064_flexspi_nor_config.h"; Local = "evkmimxrt1064_flexspi_nor_config.h"; Hash = "4073f8c6e09fccc879dcedb6fe79f679bc8c9840bb90a7f527279a9a021813d3" }
     )
 
-    Write-Host "[INFO] Downloading EVK-MIMXRT1064 board support files..."
+    Write-Host "[INFO] Downloading EVK-MIMXRT1064 board support files (pinned: $($mcuxExamplesCommit.Substring(0,8)))..."
     foreach ($item in $boardFiles) {
         $dest = Join-Path $BoardFilesDir $item.Local
-        Download-WithRetry -Uri $item.Remote -OutFile $dest
+        Download-WithRetry -Uri $item.Remote -OutFile $dest -ExpectedHash $item.Hash
     }
 
     # Copy official GNU GCC Linker Script & Startup File from DFP pack into board directory
@@ -180,44 +211,54 @@ try {
             Copy-Item -Path "$gccSource/startup_MIMXRT1064.S" -Destination $BoardFilesDir -Force
         }
     }
-    Write-Host "[OK] Board support and official GCC reference files copied"
+    Write-Host "[OK] Board support and official GCC reference files verified & copied"
     Write-Host ""
 
-    # 3. Fetch CMSIS Core headers (standard ARM CMSIS-Core include files)
-    Write-Host "[INFO] Cloning CMSIS Core headers (depth=1)..."
-    $cmsisCloneDir = Join-Path $TempDir "cmsis_core_repo"
-    git clone --depth 1 https://github.com/ARM-software/CMSIS_5.git $cmsisCloneDir
-    if ($LASTEXITCODE -ne 0) {
-        throw "Failed to clone CMSIS Core repository"
+    # 3. Fetch CMSIS Core headers (pinned ARM.CMSIS 5.9.0 release pack from ARM-software/CMSIS_5)
+    $cmsisPackUrl = "https://github.com/ARM-software/CMSIS_5/releases/download/5.9.0/ARM.CMSIS.5.9.0.pack"
+    $cmsisPackSha256 = "14b366f2821ee5d32f0d3bf48ef9657ca45347261d0531263580848e9d36f8f4"
+    $cmsisPackZip = Join-Path $TempDir "cmsis.zip"
+    $cmsisExtract = Join-Path $TempDir "cmsis_extracted"
+
+    Write-Host "[INFO] Downloading official ARM CMSIS Pack (v5.9.0)..."
+    Download-WithRetry -Uri $cmsisPackUrl -OutFile $cmsisPackZip -ExpectedHash $cmsisPackSha256
+    Write-Host "[OK] ARM CMSIS Pack verified (SHA256: $cmsisPackSha256)"
+
+    Write-Host "[INFO] Extracting CMSIS Core headers..."
+    New-Item -ItemType Directory -Path $cmsisExtract -Force | Out-Null
+    if (Get-Command tar.exe -ErrorAction SilentlyContinue) {
+        & tar.exe -xf $cmsisPackZip -C $cmsisExtract "CMSIS/Core/Include"
+    } else {
+        Expand-Archive -Path $cmsisPackZip -DestinationPath $cmsisExtract -Force
     }
-    Copy-Item -Path "$cmsisCloneDir/CMSIS/Core/Include/*" -Destination $CmsisIncludeDest -Recurse -Force
+    $cmsisSource = Join-Path $cmsisExtract "CMSIS/Core/Include"
+    Copy-Item -Path "$cmsisSource/*" -Destination $CmsisIncludeDest -Recurse -Force
     Write-Host "[OK] CMSIS Core headers copied"
     Write-Host ""
 
-    # 4. Fetch official NXP KSZ8081 PHY driver (100% stock upstream)
-    Write-Host "[INFO] Downloading official KSZ8081 PHY driver..."
-    $phyRawBase = "https://raw.githubusercontent.com/eclipse-threadx/getting-started/master/NXP/MIMXRT1060-EVK/lib/MIMXRT1060-evk/src/components/phyksz8081"
-    $phyDestDir = Join-Path $ComponentsDir "phy"
-    New-Item -ItemType Directory -Path $phyDestDir -Force | Out-Null
-    Download-WithRetry -Uri "$phyRawBase/fsl_phy.c" -OutFile (Join-Path $phyDestDir "fsl_phy.c")
-    Download-WithRetry -Uri "$phyRawBase/fsl_phy.h" -OutFile (Join-Path $phyDestDir "fsl_phy.h")
-    Write-Host "[OK] Stock KSZ8081 PHY driver downloaded"
+    # 4. Fetch official NXP KSZ8081 PHY driver (pinned to commit 37ff82f7 from eclipse-threadx/getting-started)
+    $threadxGsCommit = "37ff82f757070f3fa5364acb1ac06fcc7a5b9d38"
+    $phyRawBase = "https://raw.githubusercontent.com/eclipse-threadx/getting-started/$threadxGsCommit/NXP/MIMXRT1060-EVK/lib/MIMXRT1060-evk/src/components/phyksz8081"
+    Write-Host "[INFO] Downloading official KSZ8081 PHY driver (pinned: $($threadxGsCommit.Substring(0,8)))..."
+    Download-WithRetry -Uri "$phyRawBase/fsl_phy.c" -OutFile (Join-Path $ComponentsDir "phy/fsl_phy.c") -ExpectedHash "e3713b2b9a1a5f3f1f1680f966b3f9ee7d7ebbdaf0ce65bc9316aeb687239dfa"
+    Download-WithRetry -Uri "$phyRawBase/fsl_phy.h" -OutFile (Join-Path $ComponentsDir "phy/fsl_phy.h") -ExpectedHash "250400673cc0017ca4d67f9bc7547146bafb49c39449b6e5e615ef7be249764d"
+    Write-Host "[OK] Stock KSZ8081 PHY driver verified & downloaded"
     Write-Host ""
 
-    # 5. Fetch official NetX Duo NXP Ethernet driver (100% stock upstream)
-    Write-Host "[INFO] Downloading official NetX Duo NXP Ethernet driver..."
-    $netxRawBase = "https://raw.githubusercontent.com/eclipse-threadx/getting-started/master/NXP/MIMXRT1060-EVK/lib/netx_driver"
+    # 5. Fetch official NetX Duo NXP Ethernet driver (pinned to commit 37ff82f7 from eclipse-threadx/getting-started)
+    $netxRawBase = "https://raw.githubusercontent.com/eclipse-threadx/getting-started/$threadxGsCommit/NXP/MIMXRT1060-EVK/lib/netx_driver"
     $netxDriverDestDir = Join-Path $DriversDir "netx_driver"
     $netxDriverGnuDir = Join-Path $netxDriverDestDir "gnu"
     New-Item -ItemType Directory -Path $netxDriverGnuDir -Force | Out-Null
-    Download-WithRetry -Uri "$netxRawBase/src/nx_driver_imxrt1062.c" -OutFile (Join-Path $netxDriverDestDir "nx_driver_imxrt1062.c")
-    Download-WithRetry -Uri "$netxRawBase/src/nx_driver_imxrt1062.h" -OutFile (Join-Path $netxDriverDestDir "nx_driver_imxrt1062.h")
-    Download-WithRetry -Uri "$netxRawBase/src/gnu/nx_driver_imxrt1062_low_level.S" -OutFile (Join-Path $netxDriverGnuDir "nx_driver_imxrt1062_low_level.S")
-    Write-Host "[OK] Stock NetX Duo NXP Ethernet driver downloaded"
+    Write-Host "[INFO] Downloading official NetX Duo NXP Ethernet driver (pinned: $($threadxGsCommit.Substring(0,8)))..."
+    Download-WithRetry -Uri "$netxRawBase/src/nx_driver_imxrt1062.c" -OutFile (Join-Path $netxDriverDestDir "nx_driver_imxrt1062.c") -ExpectedHash "eecb7f8df7a767e8361df220cb65b8af9c49311bfb67f34099a916cc804587b1"
+    Download-WithRetry -Uri "$netxRawBase/src/nx_driver_imxrt1062.h" -OutFile (Join-Path $netxDriverDestDir "nx_driver_imxrt1062.h") -ExpectedHash "ab547be6957267986b30f1385f9c6832b0ea2acf17bf96a90a5e03cbd68a934f"
+    Download-WithRetry -Uri "$netxRawBase/src/gnu/nx_driver_imxrt1062_low_level.S" -OutFile (Join-Path $netxDriverGnuDir "nx_driver_imxrt1062_low_level.S") -ExpectedHash "6a60ce95bacd35754622c4c9f8c18d06ebb668545dcdf43d996945d44097b306"
+    Write-Host "[OK] Stock NetX Duo NXP Ethernet driver verified & downloaded"
     Write-Host ""
 
     Write-Host "=========================================="
-    Write-Host "[SUCCESS] NXP i.MX RT1064 drivers successfully fetched!"
+    Write-Host "[SUCCESS] NXP i.MX RT1064 drivers successfully fetched & verified!"
     Write-Host "=========================================="
 }
 finally {

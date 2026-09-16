@@ -10,7 +10,7 @@
 #  Contributors: 
 #     Ali Eissa - 2026 version.
 
-set -e
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BOARD_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
@@ -31,12 +31,34 @@ echo "=========================================="
 echo "Target Directory: ${LIB_DIR}"
 echo ""
 
+# Helper to verify file integrity via sha256sum
+verify_sha256() {
+    local file="$1"
+    local expected_sha="$2"
+    echo "${expected_sha}  ${file}" | sha256sum --check --strict >/dev/null 2>&1 || {
+        echo "[ERROR] SHA256 checksum mismatch for ${file}!" >&2
+        echo "  Expected: ${expected_sha}" >&2
+        echo "  Actual:   $(sha256sum "${file}" | awk '{print $1}')" >&2
+        exit 1
+    }
+}
+
+# Helper to download and verify
+fetch_and_verify() {
+    local url="$1"
+    local dest="$2"
+    local expected_sha="$3"
+    curl --retry 3 --retry-delay 2 -fsSL "${url}" -o "${dest}"
+    verify_sha256 "${dest}" "${expected_sha}"
+}
+
 # Clean and recreate directories
 rm -rf "${LIB_DIR}"
 mkdir -p "${DEVICE_DIR}"
 mkdir -p "${DRIVERS_DIR}"
 mkdir -p "${UTILITIES_DIR}"
 mkdir -p "${COMPONENTS_DIR}/uart"
+mkdir -p "${COMPONENTS_DIR}/phy"
 mkdir -p "${BOARD_FILES_DIR}"
 mkdir -p "${CMSIS_INCLUDE_DEST}"
 mkdir -p "${APP_STARTUP_DIR}"
@@ -51,13 +73,15 @@ clean_temp() {
 }
 trap clean_temp EXIT
 
-# 1. Download official NXP MIMXRT1064 DFP pack from NXP repository
+# 1. Download official NXP MIMXRT1064 DFP pack from NXP repository (pinned v15.1.0)
 PACK_URL="https://mcuxpresso.nxp.com/cmsis_pack/repo/NXP.MIMXRT1064_DFP.15.1.0.pack"
+PACK_SHA256="14e02f0108beba1cfe9de6b2be7b1f874695614dcc16126c452bde1b68b509f6"
 PACK_ZIP="${TEMP_DIR}/dfp.zip"
 PACK_EXTRACT="${TEMP_DIR}/dfp_extracted"
 
-echo "[INFO] Downloading official NXP MIMXRT1064 Device Pack..."
-curl -fsSL "${PACK_URL}" -o "${PACK_ZIP}"
+echo "[INFO] Downloading official NXP MIMXRT1064 Device Pack (v15.1.0)..."
+fetch_and_verify "${PACK_URL}" "${PACK_ZIP}" "${PACK_SHA256}"
+echo "[OK] NXP Device Pack verified (SHA256: ${PACK_SHA256})"
 
 echo "[INFO] Extracting Device Pack..."
 mkdir -p "${PACK_EXTRACT}"
@@ -98,20 +122,21 @@ fi
 echo "[OK] NXP Device, Driver, Utility, and Component files copied"
 echo ""
 
-# 2. Download EVK-MIMXRT1064 Board Support Files from official NXP mcuxsdk-examples
-RAW_BASE="https://raw.githubusercontent.com/nxp-mcuxpresso/mcuxsdk-examples/main/_boards/evkmimxrt1064"
-echo "[INFO] Downloading EVK-MIMXRT1064 board support files..."
+# 2. Download EVK-MIMXRT1064 Board Support Files (pinned to commit 2a340e10 from nxp-mcuxpresso/mcuxsdk-examples)
+MCUX_EXAMPLES_COMMIT="2a340e10a1105bc0af8e7176bc19148911f4cf12"
+RAW_BASE="https://raw.githubusercontent.com/nxp-mcuxpresso/mcuxsdk-examples/${MCUX_EXAMPLES_COMMIT}/_boards/evkmimxrt1064"
+echo "[INFO] Downloading EVK-MIMXRT1064 board support files (pinned: ${MCUX_EXAMPLES_COMMIT:0:8})..."
 
-curl -fsSL "${RAW_BASE}/board.c" -o "${BOARD_FILES_DIR}/board.c"
-curl -fsSL "${RAW_BASE}/board.h" -o "${BOARD_FILES_DIR}/board.h"
-curl -fsSL "${RAW_BASE}/project_template/clock_config.c" -o "${BOARD_FILES_DIR}/clock_config.c"
-curl -fsSL "${RAW_BASE}/project_template/clock_config.h" -o "${BOARD_FILES_DIR}/clock_config.h"
-curl -fsSL "${RAW_BASE}/project_template/pin_mux.c" -o "${BOARD_FILES_DIR}/pin_mux.c"
-curl -fsSL "${RAW_BASE}/project_template/pin_mux.h" -o "${BOARD_FILES_DIR}/pin_mux.h"
-curl -fsSL "${RAW_BASE}/dcd.c" -o "${BOARD_FILES_DIR}/dcd.c"
-curl -fsSL "${RAW_BASE}/dcd.h" -o "${BOARD_FILES_DIR}/dcd.h"
-curl -fsSL "${RAW_BASE}/xip/evkmimxrt1064_flexspi_nor_config.c" -o "${BOARD_FILES_DIR}/evkmimxrt1064_flexspi_nor_config.c"
-curl -fsSL "${RAW_BASE}/xip/evkmimxrt1064_flexspi_nor_config.h" -o "${BOARD_FILES_DIR}/evkmimxrt1064_flexspi_nor_config.h"
+fetch_and_verify "${RAW_BASE}/board.c" "${BOARD_FILES_DIR}/board.c" "f28885b9ac349a06a6b38f0376f6872a25ec131ab7d37947a0576255579cd959"
+fetch_and_verify "${RAW_BASE}/board.h" "${BOARD_FILES_DIR}/board.h" "9c25debd61b7fc153eeedd569155dfc8f9d1349192c6de2b431742ee6f9bb17e"
+fetch_and_verify "${RAW_BASE}/project_template/clock_config.c" "${BOARD_FILES_DIR}/clock_config.c" "ca20b253229ef02e74a9d0041173c5e1fc0c5c3df048a53be8b44e1e4218ef03"
+fetch_and_verify "${RAW_BASE}/project_template/clock_config.h" "${BOARD_FILES_DIR}/clock_config.h" "52036470ef08b16daf7ed1382a8c3c0bcc123336afc2b07df807e793365b3e80"
+fetch_and_verify "${RAW_BASE}/project_template/pin_mux.c" "${BOARD_FILES_DIR}/pin_mux.c" "4bf784e2685555e6297adccb78a27de5754e5320911bc503b5ab563577599c39"
+fetch_and_verify "${RAW_BASE}/project_template/pin_mux.h" "${BOARD_FILES_DIR}/pin_mux.h" "f696267090a271e12d9c9f3ccb0e2dfb721025ddd3728b32ab33a9fb79acbc70"
+fetch_and_verify "${RAW_BASE}/dcd.c" "${BOARD_FILES_DIR}/dcd.c" "798cd3fffea9b3b1917d6750d40735b6bc890e770f8d8b9167238220b0fae21f"
+fetch_and_verify "${RAW_BASE}/dcd.h" "${BOARD_FILES_DIR}/dcd.h" "3a5268f0ccdc02aa6df55b3fca87171df35161cca0c3e15971ac082cdefde7a3"
+fetch_and_verify "${RAW_BASE}/xip/evkmimxrt1064_flexspi_nor_config.c" "${BOARD_FILES_DIR}/evkmimxrt1064_flexspi_nor_config.c" "f6fa3d1e3a09c1a4a9d3fc44aed23513e12341e6db96aa3427c923e6b41c6e46"
+fetch_and_verify "${RAW_BASE}/xip/evkmimxrt1064_flexspi_nor_config.h" "${BOARD_FILES_DIR}/evkmimxrt1064_flexspi_nor_config.h" "4073f8c6e09fccc879dcedb6fe79f679bc8c9840bb90a7f527279a9a021813d3"
 
 echo "[INFO] Copying official NXP GNU GCC Linker Script and Startup File into board directory..."
 if [ -d "${PACK_EXTRACT}/gcc" ]; then
@@ -122,37 +147,46 @@ if [ -d "${PACK_EXTRACT}/gcc" ]; then
         cp "${PACK_EXTRACT}/gcc/startup_MIMXRT1064.S" "${BOARD_FILES_DIR}/"
     fi
 fi
-echo "[OK] Board support and official GCC reference files copied"
+echo "[OK] Board support and official GCC reference files verified & copied"
 echo ""
 
-# 3. Fetch CMSIS Core headers
-echo "[INFO] Cloning CMSIS Core headers (depth=1)..."
-CMSIS_CLONE_DIR="${TEMP_DIR}/cmsis_core_repo"
-git clone --depth 1 https://github.com/ARM-software/CMSIS_5.git "${CMSIS_CLONE_DIR}"
-cp -r "${CMSIS_CLONE_DIR}/CMSIS/Core/Include/"* "${CMSIS_INCLUDE_DEST}/"
+# 3. Fetch CMSIS Core headers (pinned ARM.CMSIS 5.9.0 release pack from ARM-software/CMSIS_5)
+CMSIS_PACK_URL="https://github.com/ARM-software/CMSIS_5/releases/download/5.9.0/ARM.CMSIS.5.9.0.pack"
+CMSIS_PACK_SHA256="14b366f2821ee5d32f0d3bf48ef9657ca45347261d0531263580848e9d36f8f4"
+CMSIS_PACK_ZIP="${TEMP_DIR}/cmsis.zip"
+CMSIS_EXTRACT="${TEMP_DIR}/cmsis_extracted"
+
+echo "[INFO] Downloading official ARM CMSIS Pack (v5.9.0)..."
+fetch_and_verify "${CMSIS_PACK_URL}" "${CMSIS_PACK_ZIP}" "${CMSIS_PACK_SHA256}"
+echo "[OK] ARM CMSIS Pack verified (SHA256: ${CMSIS_PACK_SHA256})"
+
+echo "[INFO] Extracting CMSIS Core headers..."
+mkdir -p "${CMSIS_EXTRACT}"
+unzip -q "${CMSIS_PACK_ZIP}" "CMSIS/Core/Include/*" -d "${CMSIS_EXTRACT}"
+cp -r "${CMSIS_EXTRACT}/CMSIS/Core/Include/"* "${CMSIS_INCLUDE_DEST}/"
 echo "[OK] CMSIS Core headers copied"
 echo ""
 
-# 4. Fetch official NXP KSZ8081 PHY driver (100% stock upstream)
-echo "[INFO] Downloading official KSZ8081 PHY driver..."
-PHY_RAW_BASE="https://raw.githubusercontent.com/eclipse-threadx/getting-started/master/NXP/MIMXRT1060-EVK/lib/MIMXRT1060-evk/src/components/phyksz8081"
-mkdir -p "${COMPONENTS_DIR}/phy"
-curl --retry 3 -fsSL "${PHY_RAW_BASE}/fsl_phy.c" -o "${COMPONENTS_DIR}/phy/fsl_phy.c"
-curl --retry 3 -fsSL "${PHY_RAW_BASE}/fsl_phy.h" -o "${COMPONENTS_DIR}/phy/fsl_phy.h"
-echo "[OK] Stock KSZ8081 PHY driver downloaded"
+# 4. Fetch official NXP KSZ8081 PHY driver (pinned to commit 37ff82f7 from eclipse-threadx/getting-started)
+THREADX_GS_COMMIT="37ff82f757070f3fa5364acb1ac06fcc7a5b9d38"
+PHY_RAW_BASE="https://raw.githubusercontent.com/eclipse-threadx/getting-started/${THREADX_GS_COMMIT}/NXP/MIMXRT1060-EVK/lib/MIMXRT1060-evk/src/components/phyksz8081"
+echo "[INFO] Downloading official KSZ8081 PHY driver (pinned: ${THREADX_GS_COMMIT:0:8})..."
+fetch_and_verify "${PHY_RAW_BASE}/fsl_phy.c" "${COMPONENTS_DIR}/phy/fsl_phy.c" "e3713b2b9a1a5f3f1f1680f966b3f9ee7d7ebbdaf0ce65bc9316aeb687239dfa"
+fetch_and_verify "${PHY_RAW_BASE}/fsl_phy.h" "${COMPONENTS_DIR}/phy/fsl_phy.h" "250400673cc0017ca4d67f9bc7547146bafb49c39449b6e5e615ef7be249764d"
+echo "[OK] Stock KSZ8081 PHY driver verified & downloaded"
 echo ""
 
-# 5. Fetch official NetX Duo NXP Ethernet driver (100% stock upstream)
-echo "[INFO] Downloading official NetX Duo NXP Ethernet driver..."
-NETX_RAW_BASE="https://raw.githubusercontent.com/eclipse-threadx/getting-started/master/NXP/MIMXRT1060-EVK/lib/netx_driver"
+# 5. Fetch official NetX Duo NXP Ethernet driver (pinned to commit 37ff82f7 from eclipse-threadx/getting-started)
+NETX_RAW_BASE="https://raw.githubusercontent.com/eclipse-threadx/getting-started/${THREADX_GS_COMMIT}/NXP/MIMXRT1060-EVK/lib/netx_driver"
 NETX_DIR="${DRIVERS_DIR}/netx_driver"
 mkdir -p "${NETX_DIR}/gnu"
-curl --retry 3 -fsSL "${NETX_RAW_BASE}/src/nx_driver_imxrt1062.c" -o "${NETX_DIR}/nx_driver_imxrt1062.c"
-curl --retry 3 -fsSL "${NETX_RAW_BASE}/src/nx_driver_imxrt1062.h" -o "${NETX_DIR}/nx_driver_imxrt1062.h"
-curl --retry 3 -fsSL "${NETX_RAW_BASE}/src/gnu/nx_driver_imxrt1062_low_level.S" -o "${NETX_DIR}/gnu/nx_driver_imxrt1062_low_level.S"
-echo "[OK] Stock NetX Duo NXP Ethernet driver downloaded"
+echo "[INFO] Downloading official NetX Duo NXP Ethernet driver (pinned: ${THREADX_GS_COMMIT:0:8})..."
+fetch_and_verify "${NETX_RAW_BASE}/src/nx_driver_imxrt1062.c" "${NETX_DIR}/nx_driver_imxrt1062.c" "eecb7f8df7a767e8361df220cb65b8af9c49311bfb67f34099a916cc804587b1"
+fetch_and_verify "${NETX_RAW_BASE}/src/nx_driver_imxrt1062.h" "${NETX_DIR}/nx_driver_imxrt1062.h" "ab547be6957267986b30f1385f9c6832b0ea2acf17bf96a90a5e03cbd68a934f"
+fetch_and_verify "${NETX_RAW_BASE}/src/gnu/nx_driver_imxrt1062_low_level.S" "${NETX_DIR}/gnu/nx_driver_imxrt1062_low_level.S" "6a60ce95bacd35754622c4c9f8c18d06ebb668545dcdf43d996945d44097b306"
+echo "[OK] Stock NetX Duo NXP Ethernet driver verified & downloaded"
 echo ""
 
 echo "=========================================="
-echo "[SUCCESS] NXP i.MX RT1064 drivers successfully fetched!"
+echo "[SUCCESS] NXP i.MX RT1064 drivers successfully fetched & verified!"
 echo "=========================================="
