@@ -9,6 +9,7 @@
 #  Contributors: 
 #     Ali Eissa - 2026 version.
 
+$ErrorActionPreference = "Stop"
 $BoardDir = Resolve-Path "$PSScriptRoot/.."
 $LibDir = Join-Path $BoardDir "lib/mcux-sdk"
 $DeviceDir = Join-Path $LibDir "devices/MIMXRT1064"
@@ -87,9 +88,7 @@ try {
     )
     foreach ($file in $deviceFiles) {
         $source = Join-Path $packExtract $file
-        if (Test-Path $source) {
-            Copy-Item -Path $source -Destination $DeviceDir -Force
-        }
+        Copy-Item -Path $source -Destination $DeviceDir -Force
     }
 
     # Copy core peripheral drivers
@@ -104,9 +103,7 @@ try {
     )
     foreach ($file in $driverList) {
         $source = Join-Path $packExtract "drivers/$file"
-        if (Test-Path $source) {
-            Copy-Item -Path $source -Destination $DriversDir -Force
-        }
+        Copy-Item -Path $source -Destination $DriversDir -Force
     }
 
     # Copy utilities (debug console & string formatting)
@@ -120,9 +117,7 @@ try {
     )
     foreach ($file in $utilFiles) {
         $source = Join-Path $packExtract $file
-        if (Test-Path $source) {
-            Copy-Item -Path $source -Destination $UtilitiesDir -Force
-        }
+        Copy-Item -Path $source -Destination $UtilitiesDir -Force
     }
 
     # Copy UART component adapter
@@ -133,16 +128,12 @@ try {
     )
     foreach ($file in $compUartFiles) {
         $source = Join-Path $packExtract $file
-        if (Test-Path $source) {
-            Copy-Item -Path $source -Destination $compUartDest -Force
-        }
+        Copy-Item -Path $source -Destination $compUartDest -Force
     }
 
     # Copy XIP flexspi boot header from pack
     $xipSource = Join-Path $packExtract "xip"
-    if (Test-Path $xipSource) {
-        Copy-Item -Path "$xipSource/*" -Destination $DeviceDir -Recurse -Force
-    }
+    Copy-Item -Path "$xipSource/*" -Destination $DeviceDir -Recurse -Force
     Write-Host "[OK] NXP Device, Driver, Utility, and Component files copied"
     Write-Host ""
 
@@ -200,18 +191,7 @@ try {
         Download-WithRetry -Uri $item.Remote -OutFile $dest -ExpectedHash $item.Hash
     }
 
-    # Copy official GNU GCC Linker Script & Startup File from DFP pack into board directory
-    Write-Host "[INFO] Copying official NXP GNU GCC Linker Script and Startup File into board directory..."
-    $gccSource = Join-Path $packExtract "gcc"
-    if (Test-Path $gccSource) {
-        if (Test-Path "$gccSource/MIMXRT1064xxxxx_flexspi_nor.ld") {
-            Copy-Item -Path "$gccSource/MIMXRT1064xxxxx_flexspi_nor.ld" -Destination $BoardFilesDir -Force
-        }
-        if (Test-Path "$gccSource/startup_MIMXRT1064.S") {
-            Copy-Item -Path "$gccSource/startup_MIMXRT1064.S" -Destination $BoardFilesDir -Force
-        }
-    }
-    Write-Host "[OK] Board support and official GCC reference files verified & copied"
+    Write-Host "[OK] Board support files verified & downloaded"
     Write-Host ""
 
     # 3. Fetch CMSIS Core headers (pinned ARM.CMSIS 5.9.0 release pack from ARM-software/CMSIS_5)

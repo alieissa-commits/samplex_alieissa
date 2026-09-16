@@ -89,36 +89,31 @@ unzip -q "${PACK_ZIP}" -d "${PACK_EXTRACT}"
 
 # Copy device register headers & system files
 for file in MIMXRT1064.h MIMXRT1064_features.h fsl_device_registers.h system_MIMXRT1064.c system_MIMXRT1064.h; do
-    if [ -f "${PACK_EXTRACT}/${file}" ]; then
-        cp "${PACK_EXTRACT}/${file}" "${DEVICE_DIR}/"
-    fi
+    cp "${PACK_EXTRACT}/${file}" "${DEVICE_DIR}/"
 done
 
 # Copy core peripheral drivers
 for file in fsl_clock.c fsl_clock.h fsl_common.c fsl_common.h fsl_common_arm.c fsl_common_arm.h fsl_gpio.c fsl_gpio.h fsl_lpuart.c fsl_lpuart.h fsl_enet.c fsl_enet.h fsl_iomuxc.h; do
-    if [ -f "${PACK_EXTRACT}/drivers/${file}" ]; then
-        cp "${PACK_EXTRACT}/drivers/${file}" "${DRIVERS_DIR}/"
-    fi
+    cp "${PACK_EXTRACT}/drivers/${file}" "${DRIVERS_DIR}/"
 done
 
 # Copy utilities (debug console & string formatting)
-for file in utilities/debug_console_lite/fsl_debug_console.h utilities/debug_console_lite/fsl_debug_console.c utilities/debug_console_lite/fsl_assert.c utilities/debug_console/fsl_debug_console_conf.h utilities/str/fsl_str.c utilities/str/fsl_str.h; do
-    if [ -f "${PACK_EXTRACT}/${file}" ]; then
-        cp "${PACK_EXTRACT}/${file}" "${UTILITIES_DIR}/"
-    fi
+for file in utilities/debug_console_lite/fsl_debug_console.h \
+            utilities/debug_console_lite/fsl_debug_console.c \
+            utilities/debug_console_lite/fsl_assert.c \
+            utilities/debug_console/fsl_debug_console_conf.h \
+            utilities/str/fsl_str.c \
+            utilities/str/fsl_str.h; do
+    cp "${PACK_EXTRACT}/${file}" "${UTILITIES_DIR}/"
 done
 
 # Copy UART component adapter
 for file in components/uart/fsl_adapter_uart.h components/uart/fsl_adapter_lpuart.c; do
-    if [ -f "${PACK_EXTRACT}/${file}" ]; then
-        cp "${PACK_EXTRACT}/${file}" "${COMPONENTS_DIR}/uart/"
-    fi
+    cp "${PACK_EXTRACT}/${file}" "${COMPONENTS_DIR}/uart/"
 done
 
 # Copy XIP flexspi boot headers
-if [ -d "${PACK_EXTRACT}/xip" ]; then
-    cp -r "${PACK_EXTRACT}/xip/"* "${DEVICE_DIR}/"
-fi
+cp -r "${PACK_EXTRACT}/xip/"* "${DEVICE_DIR}/"
 echo "[OK] NXP Device, Driver, Utility, and Component files copied"
 echo ""
 
@@ -138,16 +133,7 @@ fetch_and_verify "${RAW_BASE}/dcd.h" "${BOARD_FILES_DIR}/dcd.h" "3a5268f0ccdc02a
 fetch_and_verify "${RAW_BASE}/xip/evkmimxrt1064_flexspi_nor_config.c" "${BOARD_FILES_DIR}/evkmimxrt1064_flexspi_nor_config.c" "f6fa3d1e3a09c1a4a9d3fc44aed23513e12341e6db96aa3427c923e6b41c6e46"
 fetch_and_verify "${RAW_BASE}/xip/evkmimxrt1064_flexspi_nor_config.h" "${BOARD_FILES_DIR}/evkmimxrt1064_flexspi_nor_config.h" "4073f8c6e09fccc879dcedb6fe79f679bc8c9840bb90a7f527279a9a021813d3"
 
-echo "[INFO] Copying official NXP GNU GCC Linker Script and Startup File into board directory..."
-if [ -d "${PACK_EXTRACT}/gcc" ]; then
-    if [ -f "${PACK_EXTRACT}/gcc/MIMXRT1064xxxxx_flexspi_nor.ld" ]; then
-        cp "${PACK_EXTRACT}/gcc/MIMXRT1064xxxxx_flexspi_nor.ld" "${BOARD_FILES_DIR}/"
-    fi
-    if [ -f "${PACK_EXTRACT}/gcc/startup_MIMXRT1064.S" ]; then
-        cp "${PACK_EXTRACT}/gcc/startup_MIMXRT1064.S" "${BOARD_FILES_DIR}/"
-    fi
-fi
-echo "[OK] Board support and official GCC reference files verified & copied"
+echo "[OK] Board support files verified & downloaded"
 echo ""
 
 # 3. Fetch CMSIS Core headers (pinned ARM.CMSIS 5.9.0 release pack from ARM-software/CMSIS_5)
