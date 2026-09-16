@@ -11,13 +11,17 @@
  *    Ali Eissa - 2026 version.
  */
 
-#include "board_init.h"
-#include "console.h"
+#include <stdint.h>
+#include <stddef.h>
+#include <stdio.h>
+#include <string.h>
+#include "bsp/board.h"
+#include "bsp/led.h"
+#include "bsp/console.h"
+#include "board_config.h"
 #include "ansi_colors.h"
 #include "tx_api.h"
 #include "nx_api.h"
-#include <stdio.h>
-#include <string.h>
 
 #define DEMO_STACK_SIZE          2048
 #define PACKET_SIZE              1536
@@ -48,7 +52,7 @@ static void client_test_thread_entry(ULONG thread_input);
 
 int main(void)
 {
-    board_init();
+    bsp_board_init();
 
     printf(ANSI_BOLD ANSI_YELLOW "\r\n==================================================\r\n" ANSI_RESET);
     printf(ANSI_BOLD ANSI_YELLOW " MIMXRT1064 TRNG & Console Verification Client\r\n" ANSI_RESET);

@@ -1,0 +1,121 @@
+/*
+ * Copyright (c) 2026 Eclipse ThreadX contributors
+ *
+ * This program and the accompanying materials are made available
+ * under the terms of the MIT license which is available at
+ * https://opensource.org/licenses/MIT.
+ *
+ * SPDX-License-Identifier: MIT
+ */
+
+#include "bsp/console.h"
+#include "board_config.h"
+
+#include "fsl_lpuart.h"
+#include "board.h"
+
+#include <stddef.h>
+#include <stdint.h>
+
+#if BSP_HAS_CONSOLE
+static bsp_console_rx_fn volatile console_rx_handler = NULL;
+static void *volatile console_rx_context = NULL;
+
+static void console_putc(char c)
+{
+    if (c == '\n')
+    {
+        while (!(LPUART_GetStatusFlags(LPUART1) & (uint32_t)kLPUART_TxDataRegEmptyFlag))
+        {
+        }
+        LPUART_WriteByte(LPUART1, (uint8_t)'\r');
+    }
+
+    while (!(LPUART_GetStatusFlags(LPUART1) & (uint32_t)kLPUART_TxDataRegEmptyFlag))
+    {
+    }
+    LPUART_WriteByte(LPUART1, (uint8_t)c);
+}
+#endif
+
+void bsp_console_init(void)
+{
+#if BSP_HAS_CONSOLE
+    lpuart_config_t config;
+
+    LPUART_GetDefaultConfig(&config);
+    config.baudRate_Bps = BSP_UART_BAUDRATE;
+    config.enableTx     = true;
+    config.enableRx     = true;
+
+    uint32_t uartClkSrcFreq = BOARD_DebugConsoleSrcFreq();
+    LPUART_Init(LPUART1, &config, uartClkSrcFreq);
+#endif
+}
+
+void bsp_console_write(const char *data, size_t length)
+{
+#if BSP_HAS_CONSOLE
+    if ((data == NULL) || (length == 0U))
+    {
+        return;
+    }
+
+    for (size_t i = 0U; i < length; i++)
+    {
+        console_putc(data[i]);
+    }
+#else
+    (void)data;
+    (void)length;
+#endif
+}
+
+void bsp_console_set_rx_handler(bsp_console_rx_fn handler, void *context)
+{
+#if BSP_HAS_CONSOLE
+    console_rx_context = context;
+    console_rx_handler = handler;
+#else
+    (void)handler;
+    (void)context;
+#endif
+}
+
+/* Backward compatibility wrapper for existing code calling console_write */
+void console_write(const char *str)
+{
+    if (str != NULL)
+    {
+        size_t len = 0;
+        while (str[len] != '\0')
+        {
+            len++;
+        }
+        bsp_console_write(str, len);
+    }
+}
+
+/* C runtime newlib redirection */
+int _write(int file, char *ptr, int len)
+{
+    (void)file;
+    if (len > 0 && ptr != NULL)
+    {
+        bsp_console_write(ptr, (size_t)len);
+    }
+    return len;
+}
+
+int _read(int file, char *ptr, int len)
+{
+    (void)file;
+    for (int i = 0; i < len; i++)
+    {
+        while (!(LPUART_GetStatusFlags(LPUART1) & (uint32_t)kLPUART_RxDataRegFullFlag))
+        {
+        }
+        ptr[i] = (char)LPUART_ReadByte(LPUART1);
+    }
+    return len;
+}

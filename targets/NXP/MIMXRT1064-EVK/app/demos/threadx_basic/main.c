@@ -11,10 +11,14 @@
  *    Ali Eissa - 2026 version.
  */
 
-#include "board_init.h"
-#include "console.h"
-#include "tx_api.h"
+#include <stdint.h>
+#include <stddef.h>
 #include <stdio.h>
+#include "bsp/board.h"
+#include "bsp/led.h"
+#include "bsp/console.h"
+#include "board_config.h"
+#include "tx_api.h"
 
 #define HEARTBEAT_THREAD_STACK_SIZE 1024
 #define WORKER_THREAD_STACK_SIZE    1024
@@ -35,8 +39,8 @@ static void app_timer_callback(ULONG timer_input);
 
 int main(void)
 {
-    /* Initialize hardware: MPU, clocks (600 MHz), pins, and LPUART1 */
-    board_init();
+    /* Initialize hardware via BSP interface */
+    bsp_board_init();
 
     printf("\r\n");
     printf("==================================================\r\n");
@@ -123,7 +127,7 @@ static void heartbeat_thread_entry(ULONG thread_input)
         count++;
 
         /* Toggle User LED (D18) on GPIO1 Pin 9 */
-        USER_LED_TOGGLE();
+        bsp_led_toggle();
         led_state = !led_state;
 
         printf("[Heartbeat Thread] Heartbeat #%lu (System Tick: %lu | User LED: %s)\r\n",

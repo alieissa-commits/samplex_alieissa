@@ -11,14 +11,18 @@
  *    Ali Eissa - 2026 version.
  */
 
-#include "board_init.h"
-#include "console.h"
+#include <stdint.h>
+#include <stddef.h>
+#include <stdio.h>
+#include <string.h>
+#include "bsp/board.h"
+#include "bsp/led.h"
+#include "bsp/console.h"
+#include "board_config.h"
 #include "ansi_colors.h"
 #include "trng.h"
 #include "tx_api.h"
 #include "nx_api.h"
-#include <stdio.h>
-#include <string.h>
 
 #define DEMO_STACK_SIZE          2048
 #define PACKET_SIZE              1536
@@ -57,8 +61,8 @@ static void shell_thread_entry(ULONG thread_input);
 
 int main(void)
 {
-    /* Initialize MPU, clocks (600 MHz), pins, LED GPIO, console, and ENET */
-    board_init();
+    /* Initialize hardware via BSP interface */
+    bsp_board_init();
 
     /* Initialize on-chip Hardware TRNG */
     trng_init();
@@ -175,7 +179,7 @@ static void heartbeat_thread_entry(ULONG thread_input)
     while (1)
     {
         tx_thread_sleep(50);
-        USER_LED_TOGGLE();
+        bsp_led_toggle();
     }
 }
 
@@ -313,17 +317,17 @@ static void shell_thread_entry(ULONG thread_input)
                 {
                     if (strstr(line_buffer, "on"))
                     {
-                        USER_LED_ON();
+                        bsp_led_on();
                         send_tcp_response(&shell_socket, "[LED] State: ON\r\n\r\nmimxrt1064> ");
                     }
                     else if (strstr(line_buffer, "off"))
                     {
-                        USER_LED_OFF();
+                        bsp_led_off();
                         send_tcp_response(&shell_socket, "[LED] State: OFF\r\n\r\nmimxrt1064> ");
                     }
                     else
                     {
-                        USER_LED_TOGGLE();
+                        bsp_led_toggle();
                         send_tcp_response(&shell_socket, "[LED] State: TOGGLED\r\n\r\nmimxrt1064> ");
                     }
                 }

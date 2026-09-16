@@ -11,12 +11,16 @@
  *     Ali Eissa - 2026 version.
  */
 
-#include "board_init.h"
-#include "console.h"
+#include <stdint.h>
+#include <stddef.h>
+#include <stdio.h>
+#include "bsp/board.h"
+#include "bsp/led.h"
+#include "bsp/console.h"
+#include "board_config.h"
 #include "tx_api.h"
 #include "nx_api.h"
 #include "ansi_colors.h"
-#include <stdio.h>
 
 #define DEMO_STACK_SIZE         2048
 #define PACKET_SIZE             1536
@@ -57,8 +61,8 @@ static void tcp_echo_thread_entry(ULONG thread_input);
 
 int main(void)
 {
-    /* Initialize MPU, system clocks (600 MHz), pins, LED GPIO, console, and ENET pins */
-    board_init();
+    /* Initialize hardware via BSP interface */
+    bsp_board_init();
 
     printf(ANSI_BOLD ANSI_CYAN "\r\n==================================================\r\n" ANSI_RESET);
     printf(ANSI_BOLD ANSI_CYAN " Eclipse ThreadX & NetX Duo on NXP i.MX RT1064-EVK\r\n" ANSI_RESET);
@@ -190,7 +194,7 @@ static void monitor_thread_entry(ULONG thread_input)
         tx_thread_sleep(50);
 
         /* Toggle User LED to indicate active heartbeat */
-        USER_LED_TOGGLE();
+        bsp_led_toggle();
         led_state = !led_state;
     }
 }

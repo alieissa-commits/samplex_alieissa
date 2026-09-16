@@ -204,22 +204,17 @@ The decoupled architecture of `board_bsp` makes adding custom applications strai
 Create a folder under `app/demos/` (e.g., `app/demos/my_new_demo/`).
 
 ### Step 2: Write Application Code
-Create `main.c` utilizing the clean BSP initialization API:
+Create `main.c` utilizing the standard BSP API:
 ```c
-#include "board_init.h"
-#include "console.h"
+#include <bsp/board.h>
+#include <bsp/led.h>
+#include <bsp/console.h>
 #include "tx_api.h"
 
 int main(void)
 {
-    /* Initialize MPU, 600 MHz system clocks, and GPIO pins */
-    board_init();
-
-    /* Initialize LPUART1 serial console */
-    console_init();
-
-    /* Optional: Initialize Ethernet MAC/PHY if using networking */
-    // board_ethernet_init();
+    /* Initialize MPU, 600 MHz system clocks, pins, LED, and console */
+    bsp_board_init();
 
     /* Enter ThreadX RTOS Kernel */
     tx_kernel_enter();

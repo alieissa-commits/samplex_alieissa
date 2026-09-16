@@ -49,13 +49,17 @@ else()
     set(TX_USER_FILE_DIR "${CMAKE_CURRENT_LIST_DIR}/lib/threadx")
 endif()
 
+get_filename_component(WORKSPACE_ROOT "${CMAKE_CURRENT_LIST_DIR}/../../.." ABSOLUTE)
+set(SHARED_LIB_DIR "${WORKSPACE_ROOT}/libs")
+set(SHARED_BSP_DIR "${WORKSPACE_ROOT}/bsp")
+
 # Compile ThreadX Kernel from root shared libs submodule
-set(THREADX_DIR "${CMAKE_CURRENT_LIST_DIR}/../../libs/threadx")
+set(THREADX_DIR "${SHARED_LIB_DIR}/threadx")
 add_subdirectory(${THREADX_DIR} threadx)
 
 # Compile NetX Duo TCP/IP Stack from root shared libs submodule (cached for networking demos)
 set(NXD_ENABLE_FILE_SERVERS OFF CACHE BOOL "Disable FileX dependency in NetX Duo" FORCE)
-set(NETXDUO_DIR "${CMAKE_CURRENT_LIST_DIR}/../../libs/netxduo")
+set(NETXDUO_DIR "${SHARED_LIB_DIR}/netxduo")
 add_subdirectory(${NETXDUO_DIR} netxduo)
 
 # Compile the NXP MCUXpresso Driver & Board Library as an Object Library
@@ -104,46 +108,8 @@ target_include_directories(${SDK_TARGET}
         ${TX_USER_FILE_DIR}
 )
 
-# 1. Define Board BSP object library
-add_library(board_bsp OBJECT
-    app/startup/startup_mimxrt1064.S
-    app/startup/tx_initialize_low_level.S
-    app/board_init.c
-    app/console.c
-    app/trng.c
-    app/sysmem.c
-    app/syscalls.c
-)
-
-target_compile_definitions(board_bsp
-    PUBLIC
-        CPU_MIMXRT1064DVL6A
-        XIP_EXTERNAL_FLASH=1
-        XIP_BOOT_HEADER_ENABLE=1
-        XIP_BOOT_HEADER_DCD_ENABLE=1
-        FSL_SDK_DRIVER_QUICK_ACCESS_ENABLE=1
-        SDK_DEBUGCONSOLE=1
-        SKIP_SYSCLK_INIT=1
-        __STARTUP_INITIALIZE_NONCACHEDATA=1
-)
-
-target_include_directories(board_bsp
-    PUBLIC
-        ${CMAKE_CURRENT_LIST_DIR}/app
-        ${SDK_DIR}/CMSIS/Include
-        ${SDK_DIR}/devices/MIMXRT1064
-        ${SDK_DIR}/drivers
-        ${SDK_DIR}/board
-        ${SDK_DIR}/utilities
-        ${SDK_DIR}/components/uart
-        ${TX_USER_FILE_DIR}
-)
-
-target_link_libraries(board_bsp
-    PUBLIC
-        mcux_sdk
-        threadx
-)
+# 1. Define Board Support Package library
+add_subdirectory(lib/bsp)
 
 # 2. Define NetX Duo driver library targets (cached for networking demos)
 add_library(netx_imxrt_driver OBJECT
