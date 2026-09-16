@@ -106,7 +106,9 @@ def run_test(demo_name, seed=None, timeout_seconds=300):
         client_elf = os.path.join(demo_dir, "mimxrt1064_client.elf")
         if not os.path.isfile(client_elf):
             fallback_c = os.path.join(build_dir, "mimxrt1064_client.elf")
-            if not os.path.isfile(fallback_c):
+            if os.path.isfile(fallback_c):
+                client_elf = fallback_c
+            else:
                 print(f"[FAIL] Client ELF binary not found: {client_elf}")
                 return 1
 
