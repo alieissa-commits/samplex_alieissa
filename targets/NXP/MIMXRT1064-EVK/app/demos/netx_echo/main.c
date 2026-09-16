@@ -243,9 +243,25 @@ static void udp_echo_thread_entry(ULONG thread_input)
             NX_PACKET *tx_packet = NX_NULL;
             if (nx_packet_allocate(&pool_0, &tx_packet, NX_UDP_PACKET, TX_NO_WAIT) == NX_SUCCESS)
             {
-                nx_packet_data_append(tx_packet, rx_packet->nx_packet_prepend_ptr,
-                                      rx_packet->nx_packet_length, &pool_0, TX_NO_WAIT);
-                nx_udp_socket_send(&udp_socket, tx_packet, peer_ip, peer_port);
+                CHAR echo_buf[512];
+                ULONG bytes_copied = 0;
+                if (rx_packet->nx_packet_length <= sizeof(echo_buf) &&
+                    nx_packet_data_retrieve(rx_packet, echo_buf, &bytes_copied) == NX_SUCCESS)
+                {
+                    status = nx_packet_data_append(tx_packet, echo_buf, bytes_copied, &pool_0, TX_NO_WAIT);
+                    if (status == NX_SUCCESS)
+                    {
+                        status = nx_udp_socket_send(&udp_socket, tx_packet, peer_ip, peer_port);
+                    }
+                    if (status != NX_SUCCESS)
+                    {
+                        nx_packet_release(tx_packet);
+                    }
+                }
+                else
+                {
+                    nx_packet_release(tx_packet);
+                }
             }
 
             /* Release the received packet */
@@ -294,9 +310,25 @@ static void tcp_echo_thread_entry(ULONG thread_input)
                 NX_PACKET *tx_packet = NX_NULL;
                 if (nx_packet_allocate(&pool_0, &tx_packet, NX_TCP_PACKET, TX_WAIT_FOREVER) == NX_SUCCESS)
                 {
-                    nx_packet_data_append(tx_packet, packet_ptr->nx_packet_prepend_ptr,
-                                          packet_ptr->nx_packet_length, &pool_0, TX_WAIT_FOREVER);
-                    nx_tcp_socket_send(&echo_socket, tx_packet, NX_WAIT_FOREVER);
+                    CHAR echo_buf[512];
+                    ULONG bytes_copied = 0;
+                    if (packet_ptr->nx_packet_length <= sizeof(echo_buf) &&
+                        nx_packet_data_retrieve(packet_ptr, echo_buf, &bytes_copied) == NX_SUCCESS)
+                    {
+                        status = nx_packet_data_append(tx_packet, echo_buf, bytes_copied, &pool_0, TX_WAIT_FOREVER);
+                        if (status == NX_SUCCESS)
+                        {
+                            status = nx_tcp_socket_send(&echo_socket, tx_packet, TX_WAIT_FOREVER);
+                        }
+                        if (status != NX_SUCCESS)
+                        {
+                            nx_packet_release(tx_packet);
+                        }
+                    }
+                    else
+                    {
+                        nx_packet_release(tx_packet);
+                    }
                 }
                 nx_packet_release(packet_ptr);
             }

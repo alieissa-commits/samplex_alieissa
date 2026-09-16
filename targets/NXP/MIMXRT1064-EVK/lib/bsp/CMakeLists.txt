@@ -15,34 +15,15 @@ add_library(mimxrt1064_bsp STATIC
     src/bsp_selftest.c
 )
 
-target_compile_definitions(mimxrt1064_bsp
-    PUBLIC
-        CPU_MIMXRT1064DVL6A
-        XIP_EXTERNAL_FLASH=1
-        XIP_BOOT_HEADER_ENABLE=1
-        XIP_BOOT_HEADER_DCD_ENABLE=1
-        FSL_SDK_DRIVER_QUICK_ACCESS_ENABLE=1
-        SDK_DEBUGCONSOLE=1
-        SKIP_SYSCLK_INIT=1
-        __STARTUP_INITIALIZE_NONCACHEDATA=1
-)
-
 target_include_directories(mimxrt1064_bsp
     PUBLIC
         include
         ${SHARED_BSP_DIR}/include
-        ${SDK_DIR}/CMSIS/Include
-        ${SDK_DIR}/devices/MIMXRT1064
-        ${SDK_DIR}/drivers
-        ${SDK_DIR}/board
-        ${SDK_DIR}/utilities
-        ${SDK_DIR}/components/uart
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../app
-        ${TX_USER_FILE_DIR}
 )
 
 target_link_libraries(mimxrt1064_bsp
     PUBLIC
+        mimxrt1064_common
         ${SDK_TARGET}
         threadx
 )
@@ -56,34 +37,15 @@ add_library(board_bsp OBJECT
     ${CMAKE_CURRENT_SOURCE_DIR}/../../app/trng.c
 )
 
-target_compile_definitions(board_bsp
-    PUBLIC
-        CPU_MIMXRT1064DVL6A
-        XIP_EXTERNAL_FLASH=1
-        XIP_BOOT_HEADER_ENABLE=1
-        XIP_BOOT_HEADER_DCD_ENABLE=1
-        FSL_SDK_DRIVER_QUICK_ACCESS_ENABLE=1
-        SDK_DEBUGCONSOLE=1
-        SKIP_SYSCLK_INIT=1
-        __STARTUP_INITIALIZE_NONCACHEDATA=1
-)
-
 target_include_directories(board_bsp
     PUBLIC
         include
         ${SHARED_BSP_DIR}/include
-        ${SDK_DIR}/CMSIS/Include
-        ${SDK_DIR}/devices/MIMXRT1064
-        ${SDK_DIR}/drivers
-        ${SDK_DIR}/board
-        ${SDK_DIR}/utilities
-        ${SDK_DIR}/components/uart
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../app
-        ${TX_USER_FILE_DIR}
 )
 
 target_link_libraries(board_bsp
     PUBLIC
+        mimxrt1064_common
         mimxrt1064_bsp
         ${SDK_TARGET}
         threadx

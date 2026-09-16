@@ -210,22 +210,40 @@ static void client_thread_entry(ULONG thread_input)
             if (nx_packet_allocate(&client_pool, &tx_packet, NX_UDP_PACKET, TX_WAIT_FOREVER) == NX_SUCCESS)
             {
                 const char *udp_payload = "Hello ThreadX UDP Echo!";
-                nx_packet_data_append(tx_packet, (VOID *)udp_payload, strlen(udp_payload), &client_pool, TX_WAIT_FOREVER);
-                printf(TAG_CLIENT " " MSG_INFO "Sent UDP payload: '%s'\r\n" ANSI_RESET, udp_payload);
-                nx_udp_socket_send(&udp_client_socket, tx_packet, SERVER_IP_ADDRESS, ECHO_SERVER_PORT);
-
-                NX_PACKET *rx_packet = NX_NULL;
-                status = nx_udp_socket_receive(&udp_client_socket, &rx_packet, 200);
-                if (status == NX_SUCCESS && rx_packet != NX_NULL)
+                status = nx_packet_data_append(tx_packet, (VOID *)udp_payload, strlen(udp_payload), &client_pool, TX_WAIT_FOREVER);
+                if (status == NX_SUCCESS)
                 {
-                    printf(TAG_CLIENT " " MSG_SUCCESS "[PASS] Received UDP Echo: '%.*s' (%lu bytes)\r\n" ANSI_RESET,
-                           (int)rx_packet->nx_packet_length, rx_packet->nx_packet_prepend_ptr, rx_packet->nx_packet_length);
-                    nx_packet_release(rx_packet);
-                    test_udp_passed = 1;
+                    printf(TAG_CLIENT " " MSG_INFO "Sent UDP payload: '%s'\r\n" ANSI_RESET, udp_payload);
+                    status = nx_udp_socket_send(&udp_client_socket, tx_packet, SERVER_IP_ADDRESS, ECHO_SERVER_PORT);
+                }
+                if (status != NX_SUCCESS)
+                {
+                    nx_packet_release(tx_packet);
+                    printf(TAG_CLIENT " " MSG_ERROR "[FAIL] Failed to send UDP packet: 0x%02X\r\n" ANSI_RESET, status);
                 }
                 else
                 {
-                    printf(TAG_CLIENT " " MSG_ERROR "[FAIL] UDP Echo receive timed out or failed: 0x%02X\r\n" ANSI_RESET, status);
+                    NX_PACKET *rx_packet = NX_NULL;
+                    status = nx_udp_socket_receive(&udp_client_socket, &rx_packet, 200);
+                    if (status == NX_SUCCESS && rx_packet != NX_NULL)
+                    {
+                        CHAR rx_buf[128];
+                        ULONG bytes_copied = 0;
+                        nx_packet_data_retrieve(rx_packet, rx_buf, &bytes_copied);
+                        if (bytes_copied >= sizeof(rx_buf))
+                        {
+                            bytes_copied = sizeof(rx_buf) - 1;
+                        }
+                        rx_buf[bytes_copied] = '\0';
+                        printf(TAG_CLIENT " " MSG_SUCCESS "[PASS] Received UDP Echo: '%s' (%lu bytes)\r\n" ANSI_RESET,
+                               rx_buf, bytes_copied);
+                        nx_packet_release(rx_packet);
+                        test_udp_passed = 1;
+                    }
+                    else
+                    {
+                        printf(TAG_CLIENT " " MSG_ERROR "[FAIL] UDP Echo receive timed out or failed: 0x%02X\r\n" ANSI_RESET, status);
+                    }
                 }
             }
             nx_udp_socket_unbind(&udp_client_socket);
@@ -261,22 +279,40 @@ static void client_thread_entry(ULONG thread_input)
                 if (nx_packet_allocate(&client_pool, &tx_packet, NX_TCP_PACKET, TX_WAIT_FOREVER) == NX_SUCCESS)
                 {
                     const char *tcp_payload = "Hello ThreadX TCP Echo!";
-                    nx_packet_data_append(tx_packet, (VOID *)tcp_payload, strlen(tcp_payload), &client_pool, TX_WAIT_FOREVER);
-                    printf(TAG_CLIENT " " MSG_INFO "Sent TCP payload: '%s'\r\n" ANSI_RESET, tcp_payload);
-                    nx_tcp_socket_send(&tcp_client_socket, tx_packet, 200);
-
-                    NX_PACKET *rx_packet = NX_NULL;
-                    status = nx_tcp_socket_receive(&tcp_client_socket, &rx_packet, 200);
-                    if (status == NX_SUCCESS && rx_packet != NX_NULL)
+                    status = nx_packet_data_append(tx_packet, (VOID *)tcp_payload, strlen(tcp_payload), &client_pool, TX_WAIT_FOREVER);
+                    if (status == NX_SUCCESS)
                     {
-                        printf(TAG_CLIENT " " MSG_SUCCESS "[PASS] Received TCP Echo: '%.*s' (%lu bytes)\r\n" ANSI_RESET,
-                               (int)rx_packet->nx_packet_length, rx_packet->nx_packet_prepend_ptr, rx_packet->nx_packet_length);
-                        nx_packet_release(rx_packet);
-                        test_tcp_passed = 1;
+                        printf(TAG_CLIENT " " MSG_INFO "Sent TCP payload: '%s'\r\n" ANSI_RESET, tcp_payload);
+                        status = nx_tcp_socket_send(&tcp_client_socket, tx_packet, 200);
+                    }
+                    if (status != NX_SUCCESS)
+                    {
+                        nx_packet_release(tx_packet);
+                        printf(TAG_CLIENT " " MSG_ERROR "[FAIL] Failed to send TCP packet: 0x%02X\r\n" ANSI_RESET, status);
                     }
                     else
                     {
-                        printf(TAG_CLIENT " " MSG_ERROR "[FAIL] TCP Echo receive timed out or failed: 0x%02X\r\n" ANSI_RESET, status);
+                        NX_PACKET *rx_packet = NX_NULL;
+                        status = nx_tcp_socket_receive(&tcp_client_socket, &rx_packet, 200);
+                        if (status == NX_SUCCESS && rx_packet != NX_NULL)
+                        {
+                            CHAR rx_buf[128];
+                            ULONG bytes_copied = 0;
+                            nx_packet_data_retrieve(rx_packet, rx_buf, &bytes_copied);
+                            if (bytes_copied >= sizeof(rx_buf))
+                            {
+                                bytes_copied = sizeof(rx_buf) - 1;
+                            }
+                            rx_buf[bytes_copied] = '\0';
+                            printf(TAG_CLIENT " " MSG_SUCCESS "[PASS] Received TCP Echo: '%s' (%lu bytes)\r\n" ANSI_RESET,
+                                   rx_buf, bytes_copied);
+                            nx_packet_release(rx_packet);
+                            test_tcp_passed = 1;
+                        }
+                        else
+                        {
+                            printf(TAG_CLIENT " " MSG_ERROR "[FAIL] TCP Echo receive timed out or failed: 0x%02X\r\n" ANSI_RESET, status);
+                        }
                     }
                 }
                 nx_tcp_socket_disconnect(&tcp_client_socket, 100);

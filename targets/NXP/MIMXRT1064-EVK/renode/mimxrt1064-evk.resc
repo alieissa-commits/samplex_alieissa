@@ -17,7 +17,7 @@ mach create "mimxrt1064-evk"
 $platform?=$ORIGIN/mimxrt1064-evk.repl
 machine LoadPlatformDescription $platform
 
-$bin?=$ORIGIN/../build/mimxrt1064_threadx.elf
+$bin?=$ORIGIN/../build/app/demos/netx_echo/mimxrt1064_threadx.elf
 
 # Create Ethernet Switch and connect ENET peripheral
 emulation CreateSwitch "switch"
