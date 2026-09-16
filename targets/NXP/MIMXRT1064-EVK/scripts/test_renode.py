@@ -9,7 +9,8 @@
 # SPDX-License-Identifier: MIT
 #
 # Contributors:
-#    Ali Eissa - 2026 NXP i.MX RT1064 port.
+#    Ali Eissa - 2026 version.
+#    Assisted-by: Google DeepMind Antigravity (Gemini 3.8 Flash)
 
 """
 Headless Renode Verification Test for NXP i.MX RT1064-EVK Demos.

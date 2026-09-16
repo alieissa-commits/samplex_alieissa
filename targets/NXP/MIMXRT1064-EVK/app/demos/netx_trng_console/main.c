@@ -9,6 +9,7 @@
  *
  * Contributors:
  *    Ali Eissa - 2026 version.
+ *    Assisted-by: Google DeepMind Antigravity (Gemini 3.8 Flash)
  */
 
 #include <stdint.h>

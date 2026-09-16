@@ -6,7 +6,8 @@
 //
 // SPDX-License-Identifier: MIT
 //
-// Platform description for NXP i.MX RT1064-EVK (Simulated in Renode).
+// Contributors:
+//    Ali Eissa - 2026 version.
 
 using "platforms/boards/mimxrt1064_evk.repl"
 
