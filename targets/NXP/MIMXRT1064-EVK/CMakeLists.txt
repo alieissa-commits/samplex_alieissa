@@ -62,6 +62,33 @@ set(NXD_ENABLE_FILE_SERVERS OFF CACHE BOOL "Disable FileX dependency in NetX Duo
 set(NETXDUO_DIR "${SHARED_LIB_DIR}/netxduo")
 add_subdirectory(${NETXDUO_DIR} netxduo)
 
+# Common board configuration interface carrying compile definitions and core SDK include directories
+add_library(mimxrt1064_common INTERFACE)
+
+target_compile_definitions(mimxrt1064_common
+    INTERFACE
+        CPU_MIMXRT1064DVL6A
+        XIP_EXTERNAL_FLASH=1
+        XIP_BOOT_HEADER_ENABLE=1
+        XIP_BOOT_HEADER_DCD_ENABLE=1
+        FSL_SDK_DRIVER_QUICK_ACCESS_ENABLE=1
+        SDK_DEBUGCONSOLE=1
+        SKIP_SYSCLK_INIT=1
+        __STARTUP_INITIALIZE_NONCACHEDATA=1
+)
+
+target_include_directories(mimxrt1064_common
+    INTERFACE
+        ${SDK_DIR}/CMSIS/Include
+        ${SDK_DIR}/devices/MIMXRT1064
+        ${SDK_DIR}/drivers
+        ${SDK_DIR}/board
+        ${SDK_DIR}/utilities
+        ${SDK_DIR}/components/uart
+        ${CMAKE_CURRENT_LIST_DIR}/app
+        ${TX_USER_FILE_DIR}
+)
+
 # Compile the NXP MCUXpresso Driver & Board Library as an Object Library
 set(SDK_TARGET mcux_sdk)
 
@@ -84,118 +111,50 @@ add_library(${SDK_TARGET} OBJECT
     ${SDK_DIR}/components/uart/fsl_adapter_lpuart.c
 )
 
-target_compile_definitions(${SDK_TARGET}
+target_link_libraries(${SDK_TARGET}
     PUBLIC
-        CPU_MIMXRT1064DVL6A
-        XIP_EXTERNAL_FLASH=1
-        XIP_BOOT_HEADER_ENABLE=1
-        XIP_BOOT_HEADER_DCD_ENABLE=1
-        FSL_SDK_DRIVER_QUICK_ACCESS_ENABLE=1
-        SDK_DEBUGCONSOLE=1
-        SKIP_SYSCLK_INIT=1
-        __STARTUP_INITIALIZE_NONCACHEDATA=1
-)
-
-target_include_directories(${SDK_TARGET}
-    PUBLIC
-        ${SDK_DIR}/CMSIS/Include
-        ${SDK_DIR}/devices/MIMXRT1064
-        ${SDK_DIR}/drivers
-        ${SDK_DIR}/board
-        ${SDK_DIR}/utilities
-        ${SDK_DIR}/components/uart
-        ${CMAKE_CURRENT_LIST_DIR}/app
-        ${TX_USER_FILE_DIR}
+        mimxrt1064_common
 )
 
 # 1. Define Board Support Package library
 add_subdirectory(lib/bsp)
 
 # 2. Define NetX Duo driver library targets (cached for networking demos)
-add_library(netx_imxrt_driver OBJECT
-        ${CMAKE_CURRENT_LIST_DIR}/lib/netx_driver/nx_driver_imxrt1062.c
-        ${CMAKE_CURRENT_LIST_DIR}/lib/netx_driver/gnu/nx_driver_imxrt1062_low_level.S
-        ${CMAKE_CURRENT_LIST_DIR}/lib/phyksz8081/fsl_phy.c
-        ${SDK_DIR}/drivers/fsl_enet.c
-    )
+add_library(netx_imxrt_driver_common INTERFACE)
 
-    target_compile_definitions(netx_imxrt_driver
-        PUBLIC
-            CPU_MIMXRT1064DVL6A
-            XIP_EXTERNAL_FLASH=1
-            XIP_BOOT_HEADER_ENABLE=1
-            XIP_BOOT_HEADER_DCD_ENABLE=1
-            FSL_SDK_DRIVER_QUICK_ACCESS_ENABLE=1
-            SDK_DEBUGCONSOLE=1
-            SKIP_SYSCLK_INIT=1
-            __STARTUP_INITIALIZE_NONCACHEDATA=1
-    )
+target_include_directories(netx_imxrt_driver_common
+    INTERFACE
+        ${CMAKE_CURRENT_LIST_DIR}/lib/netx_driver
+        ${CMAKE_CURRENT_LIST_DIR}/lib/phyksz8081
+        ${CMAKE_CURRENT_LIST_DIR}/lib/netxduo
+)
 
-    target_include_directories(netx_imxrt_driver
-        PUBLIC
-            ${CMAKE_CURRENT_LIST_DIR}/lib/netx_driver
-            ${CMAKE_CURRENT_LIST_DIR}/lib/phyksz8081
-            ${CMAKE_CURRENT_LIST_DIR}/app
-            ${CMAKE_CURRENT_LIST_DIR}/lib/netxduo
-            ${SDK_DIR}/CMSIS/Include
-            ${SDK_DIR}/devices/MIMXRT1064
-            ${SDK_DIR}/drivers
-            ${SDK_DIR}/board
-            ${SDK_DIR}/utilities
-            ${SDK_DIR}/components/uart
-            ${TX_USER_FILE_DIR}
-    )
+target_compile_options(netx_imxrt_driver_common
+    INTERFACE
+        -Wno-unused-variable
+)
 
-    target_link_libraries(netx_imxrt_driver
-        PUBLIC
-            netxduo
-            threadx
-            mcux_sdk
-    )
-    target_compile_options(netx_imxrt_driver PRIVATE -Wno-unused-variable)
+target_link_libraries(netx_imxrt_driver_common
+    INTERFACE
+        mimxrt1064_common
+        netxduo
+        threadx
+        mcux_sdk
+)
 
-    add_library(netx_imxrt_driver_client OBJECT
-        ${CMAKE_CURRENT_LIST_DIR}/lib/netx_driver/nx_driver_imxrt1062.c
-        ${CMAKE_CURRENT_LIST_DIR}/lib/netx_driver/gnu/nx_driver_imxrt1062_low_level.S
-        ${CMAKE_CURRENT_LIST_DIR}/lib/phyksz8081/fsl_phy.c
-        ${SDK_DIR}/drivers/fsl_enet.c
-    )
+set(NETX_DRIVER_SOURCES
+    ${CMAKE_CURRENT_LIST_DIR}/lib/netx_driver/nx_driver_imxrt1062.c
+    ${CMAKE_CURRENT_LIST_DIR}/lib/netx_driver/gnu/nx_driver_imxrt1062_low_level.S
+    ${CMAKE_CURRENT_LIST_DIR}/lib/phyksz8081/fsl_phy.c
+    ${SDK_DIR}/drivers/fsl_enet.c
+)
 
-    target_compile_definitions(netx_imxrt_driver_client
-        PUBLIC
-            NETX_CLIENT_NODE=1
-            CPU_MIMXRT1064DVL6A
-            XIP_EXTERNAL_FLASH=1
-            XIP_BOOT_HEADER_ENABLE=1
-            XIP_BOOT_HEADER_DCD_ENABLE=1
-            FSL_SDK_DRIVER_QUICK_ACCESS_ENABLE=1
-            SDK_DEBUGCONSOLE=1
-            SKIP_SYSCLK_INIT=1
-            __STARTUP_INITIALIZE_NONCACHEDATA=1
-    )
+add_library(netx_imxrt_driver OBJECT ${NETX_DRIVER_SOURCES})
+target_link_libraries(netx_imxrt_driver PUBLIC netx_imxrt_driver_common)
 
-    target_include_directories(netx_imxrt_driver_client
-        PUBLIC
-            ${CMAKE_CURRENT_LIST_DIR}/lib/netx_driver
-            ${CMAKE_CURRENT_LIST_DIR}/lib/phyksz8081
-            ${CMAKE_CURRENT_LIST_DIR}/app
-            ${CMAKE_CURRENT_LIST_DIR}/lib/netxduo
-            ${SDK_DIR}/CMSIS/Include
-            ${SDK_DIR}/devices/MIMXRT1064
-            ${SDK_DIR}/drivers
-            ${SDK_DIR}/board
-            ${SDK_DIR}/utilities
-            ${SDK_DIR}/components/uart
-            ${TX_USER_FILE_DIR}
-    )
-
-    target_link_libraries(netx_imxrt_driver_client
-        PUBLIC
-            netxduo
-            threadx
-            mcux_sdk
-    )
-    target_compile_options(netx_imxrt_driver_client PRIVATE -Wno-unused-variable)
+add_library(netx_imxrt_driver_client OBJECT ${NETX_DRIVER_SOURCES})
+target_link_libraries(netx_imxrt_driver_client PUBLIC netx_imxrt_driver_common)
+target_compile_definitions(netx_imxrt_driver_client PUBLIC NETX_CLIENT_NODE=1)
 
 # 3. Add demo subdirectories to build executable targets
 if(ACTIVE_DEMO STREQUAL "all")
