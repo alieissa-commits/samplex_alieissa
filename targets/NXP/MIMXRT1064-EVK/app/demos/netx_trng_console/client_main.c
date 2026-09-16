@@ -110,19 +110,35 @@ static UINT send_and_receive(NX_TCP_SOCKET *socket, const char *cmd, char *rx_bu
     UINT status;
 
     status = nx_packet_allocate(&client_pool, &tx_packet, NX_TCP_PACKET, TX_WAIT_FOREVER);
-    if (status != NX_SUCCESS) return status;
+    if (status != NX_SUCCESS)
+    {
+        return status;
+    }
 
-    nx_packet_data_append(tx_packet, (VOID *)cmd, strlen(cmd), &client_pool, TX_WAIT_FOREVER);
+    status = nx_packet_data_append(tx_packet, (VOID *)cmd, strlen(cmd), &client_pool, TX_WAIT_FOREVER);
+    if (status != NX_SUCCESS)
+    {
+        nx_packet_release(tx_packet);
+        return status;
+    }
+
     status = nx_tcp_socket_send(socket, tx_packet, TX_WAIT_FOREVER);
-    if (status != NX_SUCCESS) return status;
+    if (status != NX_SUCCESS)
+    {
+        nx_packet_release(tx_packet);
+        return status;
+    }
 
     status = nx_tcp_socket_receive(socket, &rx_packet, timeout);
     if (status == NX_SUCCESS && rx_packet != NX_NULL)
     {
-        ULONG len = rx_packet->nx_packet_length;
-        if (len >= rx_buf_size) len = rx_buf_size - 1;
-        memcpy(rx_buf, rx_packet->nx_packet_prepend_ptr, len);
-        rx_buf[len] = '\0';
+        ULONG bytes_copied = 0;
+        nx_packet_data_retrieve(rx_packet, rx_buf, &bytes_copied);
+        if (bytes_copied >= rx_buf_size)
+        {
+            bytes_copied = rx_buf_size - 1;
+        }
+        rx_buf[bytes_copied] = '\0';
         nx_packet_release(rx_packet);
     }
     return status;
@@ -197,13 +213,50 @@ static void client_test_thread_entry(ULONG thread_input)
         printf("\r\n" TAG_CLIENT " [Test 3/5] Querying on-chip TRNG entropy ('trng')...\r\n");
         memset(buffer, 0, sizeof(buffer));
         status = send_and_receive(&client_socket, "trng\r\n", buffer, sizeof(buffer), 200);
-        if (status == NX_SUCCESS && strstr(buffer, "[TRNG] Hardware Entropy:"))
+
+        char *entropy_str = (status == NX_SUCCESS) ? strstr(buffer, "[TRNG] Hardware Entropy:") : NX_NULL;
+        if (entropy_str != NX_NULL)
         {
-            printf(TAG_CLIENT " " MSG_SUCCESS " Hardware TRNG Entropy Received:\r\n  %s", buffer);
+            const char *vals_str = entropy_str + strlen("[TRNG] Hardware Entropy:");
+            unsigned long w1 = 0, w2 = 0, w3 = 0, w4 = 0;
+            int parsed = sscanf(vals_str, "%lx %lx %lx %lx", &w1, &w2, &w3, &w4);
+
+            if (parsed != 4)
+            {
+                printf(TAG_CLIENT " " MSG_ERROR " Assertion failed: Expected 4 entropy words, parsed %d\r\n", parsed);
+                all_passed = 0;
+            }
+            else if (w1 == 0 && w2 == 0 && w3 == 0 && w4 == 0)
+            {
+                printf(TAG_CLIENT " " MSG_ERROR " Assertion failed: All 4 entropy words are zero (0x00000000)\r\n");
+                all_passed = 0;
+            }
+            else if (w1 == w2 || w1 == w3 || w1 == w4 || w2 == w3 || w2 == w4 || w3 == w4)
+            {
+                printf(TAG_CLIENT " " MSG_ERROR " Assertion failed: Entropy words are not distinct (0x%08lX 0x%08lX 0x%08lX 0x%08lX)\r\n",
+                       w1, w2, w3, w4);
+                all_passed = 0;
+            }
+            else
+            {
+                printf(TAG_CLIENT " " MSG_SUCCESS " Hardware TRNG Entropy Received:\r\n  %s", buffer);
+                printf(TAG_CLIENT " " MSG_SUCCESS " Entropy words verified: 4 words parsed, non-zero, all mutually distinct.\r\n");
+
+                /* Verify exact sequence under deterministic Renode simulation (seed 12345) */
+                const unsigned long seed_12345_w1 = 0x69D43FF3UL;
+                const unsigned long seed_12345_w2 = 0x54E900EEUL;
+                const unsigned long seed_12345_w3 = 0x2514F462UL;
+                const unsigned long seed_12345_w4 = 0x39F5B5D8UL;
+
+                if (w1 == seed_12345_w1 && w2 == seed_12345_w2 && w3 == seed_12345_w3 && w4 == seed_12345_w4)
+                {
+                    printf(TAG_CLIENT " " MSG_SUCCESS " Deterministic seed (12345) PRNG sequence verified exactly!\r\n");
+                }
+            }
         }
         else
         {
-            printf(TAG_CLIENT " " MSG_ERROR " TRNG query failed (status: 0x%02X)\r\n", status);
+            printf(TAG_CLIENT " " MSG_ERROR " TRNG query failed (status: 0x%02X, response: '%s')\r\n", status, buffer);
             all_passed = 0;
         }
 

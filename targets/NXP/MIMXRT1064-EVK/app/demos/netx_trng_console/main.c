@@ -190,10 +190,23 @@ static void send_tcp_response(NX_TCP_SOCKET *socket, const char *msg)
     size_t len = strlen(msg);
 
     status = nx_packet_allocate(&pool_0, &tx_packet, NX_TCP_PACKET, TX_WAIT_FOREVER);
-    if (status == NX_SUCCESS)
+    if (status != NX_SUCCESS)
     {
-        nx_packet_data_append(tx_packet, (VOID *)msg, len, &pool_0, TX_WAIT_FOREVER);
-        nx_tcp_socket_send(socket, tx_packet, TX_WAIT_FOREVER);
+        return;
+    }
+
+    status = nx_packet_data_append(tx_packet, (VOID *)msg, len, &pool_0, TX_WAIT_FOREVER);
+    if (status != NX_SUCCESS)
+    {
+        nx_packet_release(tx_packet);
+        return;
+    }
+
+    status = nx_tcp_socket_send(socket, tx_packet, 200);
+    if (status != NX_SUCCESS)
+    {
+        /* In NetX Duo, a failed send leaves packet ownership with the caller */
+        nx_packet_release(tx_packet);
     }
 }
 
@@ -255,20 +268,28 @@ static void shell_thread_entry(ULONG thread_input)
                     break;
                 }
 
-                ULONG copy_len = packet_ptr->nx_packet_length;
-                if (copy_len >= sizeof(line_buffer))
-                {
-                    copy_len = sizeof(line_buffer) - 1;
-                }
-                memcpy(line_buffer, packet_ptr->nx_packet_prepend_ptr, copy_len);
-                line_buffer[copy_len] = '\0';
+                ULONG bytes_copied = 0;
+                status = nx_packet_data_retrieve(packet_ptr, line_buffer, &bytes_copied);
                 nx_packet_release(packet_ptr);
 
-                /* Trim trailing CRLF */
-                char *p = line_buffer + strlen(line_buffer) - 1;
-                while (p >= line_buffer && (*p == '\r' || *p == '\n' || *p == ' '))
+                if (status != NX_SUCCESS && bytes_copied == 0)
                 {
-                    *p-- = '\0';
+                    continue;
+                }
+
+                if (bytes_copied >= sizeof(line_buffer))
+                {
+                    bytes_copied = sizeof(line_buffer) - 1;
+                }
+                line_buffer[bytes_copied] = '\0';
+
+                /* Safe trimming of trailing CRLF and spaces without pointer underflow */
+                size_t len = strlen(line_buffer);
+                while (len > 0 && (line_buffer[len - 1] == '\r' ||
+                                   line_buffer[len - 1] == '\n' ||
+                                   line_buffer[len - 1] == ' '))
+                {
+                    line_buffer[--len] = '\0';
                 }
 
                 if (strlen(line_buffer) == 0)
@@ -292,17 +313,29 @@ static void shell_thread_entry(ULONG thread_input)
                 else if (strcmp(line_buffer, "trng") == 0 || strcmp(line_buffer, "rand") == 0)
                 {
                     uint32_t r1 = 0, r2 = 0, r3 = 0, r4 = 0;
-                    trng_get_random_u32(&r1);
-                    trng_get_random_u32(&r2);
-                    trng_get_random_u32(&r3);
-                    trng_get_random_u32(&r4);
+                    int s1 = trng_get_random_u32(&r1);
+                    int s2 = trng_get_random_u32(&r2);
+                    int s3 = trng_get_random_u32(&r3);
+                    int s4 = trng_get_random_u32(&r4);
 
-                    snprintf(resp_buffer, sizeof(resp_buffer),
-                             "[TRNG] Hardware Entropy: 0x%08lX 0x%08lX 0x%08lX 0x%08lX\r\n\r\nmimxrt1064> ",
-                             (unsigned long)r1, (unsigned long)r2, (unsigned long)r3, (unsigned long)r4);
-                    printf(TAG_TRNG " Generated entropy: 0x%08lX 0x%08lX 0x%08lX 0x%08lX\r\n",
-                           (unsigned long)r1, (unsigned long)r2, (unsigned long)r3, (unsigned long)r4);
-                    send_tcp_response(&shell_socket, resp_buffer);
+                    if (s1 != 0 || s2 != 0 || s3 != 0 || s4 != 0)
+                    {
+                        snprintf(resp_buffer, sizeof(resp_buffer),
+                                 "[TRNG] Error: Entropy generation failed (status: %d, %d, %d, %d)\r\n\r\nmimxrt1064> ",
+                                 s1, s2, s3, s4);
+                        printf(TAG_TRNG " " MSG_ERROR "Entropy generation failed (status: %d, %d, %d, %d)\r\n",
+                               s1, s2, s3, s4);
+                        send_tcp_response(&shell_socket, resp_buffer);
+                    }
+                    else
+                    {
+                        snprintf(resp_buffer, sizeof(resp_buffer),
+                                 "[TRNG] Hardware Entropy: 0x%08lX 0x%08lX 0x%08lX 0x%08lX\r\n\r\nmimxrt1064> ",
+                                 (unsigned long)r1, (unsigned long)r2, (unsigned long)r3, (unsigned long)r4);
+                        printf(TAG_TRNG " Generated entropy: 0x%08lX 0x%08lX 0x%08lX 0x%08lX\r\n",
+                               (unsigned long)r1, (unsigned long)r2, (unsigned long)r3, (unsigned long)r4);
+                        send_tcp_response(&shell_socket, resp_buffer);
+                    }
                 }
                 else if (strcmp(line_buffer, "info") == 0)
                 {
