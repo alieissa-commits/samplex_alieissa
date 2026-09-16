@@ -15,8 +15,8 @@
  * Compatibility header: redirects MIMXRT1062.h from stock NetX Duo driver
  * to MIMXRT1064 device registers without modifying vendor source files.
  */
-#ifndef _MIMXRT1062_H_
-#define _MIMXRT1062_H_
+#ifndef MIMXRT1062_H
+#define MIMXRT1062_H
 
 #include "fsl_device_registers.h"
 
@@ -30,4 +30,4 @@
 #define NX_DRIVER_ETHERNET_MAC {0x02, 0x11, 0x22, 0x33, 0x44, 0x52}
 #endif
 
-#endif /* _MIMXRT1062_H_ */
+#endif /* MIMXRT1062_H */
