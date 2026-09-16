@@ -1,119 +1,80 @@
-# NXP i.MX RT1064-EVK Board Enablement Demos
+# NXP i.MX RT1064-EVK — Eclipse ThreadX & NetX Duo
 
-This directory contains the Board Support Package and build configurations for running the **Eclipse ThreadX RTOS** and **NetX Duo TCP/IP stack** on the **NXP i.MX RT1064-EVK** evaluation board.
+Welcome to the board enablement package for running **Eclipse ThreadX RTOS** and **NetX Duo** on the high-performance **NXP i.MX RT1064-EVK** (ARM Cortex-M7 @ 600 MHz).
 
-The project features a decoupled Board Support Package (`board_bsp`) that hides all low-level hardware initializations from the high-level application code (clocks, power, caches, MPU regions, pin muxing, Ethernet MAC/PHY descriptors, and on-chip cryptographic peripherals).
-
-> [!WARNING]
-> **Verification Status: Not verified on hardware.**
-> All automated tests currently run exclusively under **Antmicro Renode** system emulation.
-
-### Emulation Scope & Boundaries
-
-#### What Renode Verifies:
-* **Boot & Execution**: The image boots from simulated FlexSPI NOR Flash into ARM Cortex-M7 privileged mode.
-* **ThreadX RTOS Kernel**: Preemptive thread scheduling, thread synchronization, and software timers operate correctly.
-* **NetX Duo Networking**: Full TCP/IP operation over Renode's Ethernet (`ENET`) model, verified through multi-node ICMP ping, UDP echo, and TCP streaming across a virtual switch.
-
-#### What Renode Does Not Model:
-* **Clock Tree & PLLs**: Renode uses stub peripherals (`Tag`) for the Clock Control Module (`CCM`) and `ANALOG` blocks. Registers like `CCM_CBCDR` return fixed values (e.g. `0x000A8200`), meaning PLL lock sequences and clock gating succeed unconditionally without exercising silicon timing.
-* **Core Frequency**: The `600 MHz` displayed in the boot banner is the SDK's compile-time configuration constant (`SystemCoreClock`), not a measured hardware frequency.
-* **Pin Muxing & Reset Controller**: `IOMUXC`, `IOMUXC_GPR`, `SRC`, and `OCOTP` are stubbed and answer unconditionally.
+This target provides ready-to-run demos ranging from fundamental task scheduling and GPIO blinking to full multi-node TCP/IP networking and on-chip hardware cryptographic entropy (TRNG) — testable on physical hardware or immediately on your workstation using **Antmicro Renode** system simulation.
 
 ---
 
-## Supported Demos
+## Quick Start
 
-Each demo outputs into its own isolated directory in `build/app/demos/<demo_name>/`:
+You don't need a physical board to get started! You can fetch dependencies, build all targets, and run the automated test suite in three simple steps:
 
-| Demo Name | Description | Output Directory |
-| :--- | :--- | :--- |
-| **`threadx_basic`** | Core ThreadX RTOS demo: preemptive thread scheduling, timer callbacks, and User LED D18 heartbeat blinking. | `build/app/demos/threadx_basic/` |
-| **`netx_echo`** | NetX Duo networking demo: KSZ8081 Ethernet PHY, ARP, ICMP Ping responder, UDP echo (port 7), and TCP echo server (port 7). | `build/app/demos/netx_echo/` |
-| **`netx_trng_console`** *(Default)* | Hardware cryptographic True Random Number Generator (TRNG @ `0x400CC000`) with an interactive TCP diagnostic management shell on port 23. | `build/app/demos/netx_trng_console/` |
-
----
-
-## Hardware Overview
-
-* **Evaluation Board**: NXP MIMXRT1064-EVK (ARM Cortex-M7 @ 600 MHz)
-* **Memory**: 4 MB on-chip FlexSPI NOR Flash (`0x70000000`), 1 MB on-chip SRAM (ITCM, DTCM, NonCacheable OCRAM)
-* **Serial Console**: LPUART1 via OpenSDA micro-USB (`J41`), 115,200 baud, 8N1
-* **User LED & Button**: Green LED `D18` (`GPIO1_IO09`), SW8 WAKEUP button (`GPIO5_IO00`)
-* **Ethernet**: ENET MAC + Microchip KSZ8081RNA PHY via RMII
-* **TRNG Hardware**: On-chip True Random Number Generator (`0x400CC000`)
-
----
-
-## Prerequisites
-
+### 1. Prerequisites
+Ensure you have the following installed on your machine:
 * **ARM GNU Toolchain** (`arm-none-eabi-gcc` 10.3+)
 * **CMake** (3.20+) and **Ninja** (recommended) or Make
-* **Git** (for downloading SDK dependencies)
+* **Python 3** (3.8+, for automated Renode test runners)
 * **Antmicro Renode** (1.15.3+, for simulation)
+* **Git** (for repository submodules)
 
----
+### 2. Fetch Dependencies & Build
+Download the official NXP MCUXpresso SDK drivers and build all demos:
 
-## Quick Start Guide
-
-### 1. Download SDK Dependencies
-Download the stock NXP MCUXpresso SDK drivers, CMSIS headers, and board files:
-
-* **Windows**:
+* **Windows (PowerShell)**:
   ```powershell
+  # 1. Fetch NXP SDK peripheral drivers and CMSIS headers (verified with SHA-256)
   powershell -ExecutionPolicy Bypass -File .\scripts\fetch_sdk.ps1
-  ```
-* **Linux / macOS**:
-  ```bash
-  chmod +x ./scripts/fetch_sdk.sh && ./scripts/fetch_sdk.sh
-  ```
 
-### 2. Build the Demos
-
-#### Option A: Build All Demos (Default & Recommended)
-Build all three demos at once. Once built, you can switch between simulations instantly without rebuilding!
-
-* **Windows**:
-  ```powershell
+  # 2. Build all demos (produces both single-node and multi-node ELF binaries)
   powershell -ExecutionPolicy Bypass -File .\scripts\build.ps1
   ```
-* **Linux / macOS**:
+
+* **Linux / macOS (Bash)**:
   ```bash
-  chmod +x ./scripts/build.sh && ./scripts/build.sh
+  # 1. Fetch NXP SDK peripheral drivers and CMSIS headers (verified with SHA-256)
+  chmod +x ./scripts/*.sh
+  ./scripts/fetch_sdk.sh
+
+  # 2. Build all demos
+  ./scripts/build.sh
   ```
-* **Direct CMake**:
-  ```bash
-  cmake -B build -G Ninja -DACTIVE_DEMO=all
-  cmake --build build
-  ```
 
-#### Option B: Build a Specific Demo
-To build only one specific demo:
+> [!NOTE]
+> The NetX Duo Ethernet driver (`lib/netx_driver`) and KSZ8081 PHY driver (`lib/phyksz8081`) are pre-vendored in this repository. `fetch_sdk` only downloads the official NXP core MCU peripheral drivers and CMSIS headers, verifying every archive against pinned SHA-256 checksums.
 
-```powershell
-# Windows PowerShell
-.\scripts\build.ps1 -Demo threadx_basic
-.\scripts\build.ps1 -Demo netx_echo
-.\scripts\build.ps1 -Demo netx_trng_console
-```
-
+### 3. Run Automated Tests
+Verify that all demos build and pass under Renode simulation:
 ```bash
-# Linux / macOS Bash
-./scripts/build.sh -d threadx_basic
-./scripts/build.sh -d netx_echo
-./scripts/build.sh -d netx_trng_console
+python ./scripts/test_renode.py --demo threadx_basic
+python ./scripts/test_renode.py --demo netx_echo
+python ./scripts/test_renode.py --demo netx_trng_console --seed 12345
 ```
-
-Each demo's artifacts (`.elf`, `.bin`, `.hex`, `.map`) are placed in `build/app/demos/<demo_name>/`.
 
 ---
 
-## Renode Simulation
+## Supported Applications
 
-The project includes preconfigured Renode emulation environments for both single-node and multi-node scenarios.
+The build system can compile all demos together (default) or individual demos on demand. Output artifacts are placed in `build/app/demos/<demo_name>/`:
 
-### 1. Interactive Simulation
-Simulate any demo simply by passing the `-Demo` configuration variable:
+| Application | Architecture | What It Demonstrates | Generated Binaries |
+| :--- | :--- | :--- | :--- |
+| **`threadx_basic`** | Single-Node | ThreadX kernel fundamentals: preemptive priority scheduling, software timer callbacks, and user LED (`D18`) heartbeat blinking. | `mimxrt1064_threadx.elf`<br>`mimxrt1064_threadx.bin` |
+| **`netx_echo`** | Multi-Node | Full NetX Duo network stack: ARP resolution, ICMP ping replies, UDP datagram echo (port 7), and TCP stream echo (port 7). | `mimxrt1064_threadx.elf` *(Server: 192.168.0.100)*<br>`mimxrt1064_client.elf` *(Client: 192.168.0.101)* |
+| **`netx_trng_console`** | Multi-Node | On-chip hardware True Random Number Generator (`0x400CC000`) integrated with an interactive TCP remote diagnostics management shell (port 23). | `mimxrt1064_threadx.elf` *(Server: 192.168.0.100)*<br>`mimxrt1064_client.elf` *(Client: 192.168.0.101)* |
+
+> [!NOTE]
+> **How Multi-Node Verification Works**:
+> In `netx_echo` and `netx_trng_console`, Renode boots **two independent virtual i.MX RT1064 machines** interconnected via a simulated Ethernet switch. The **server** node runs ThreadX services, while the **client** node runs an automated test suite that transmits network traffic, asserts on responses, and validates cryptographic entropy.
+
+---
+
+## Renode Simulation Guide
+
+Renode provides accurate instruction-level simulation of the ARM Cortex-M7 core and key peripherals, enabling end-to-end verification without hardware.
+
+### 1. Interactive Simulation (GUI)
+Launch Renode with virtual serial terminal windows attached to the microcontroller's UART console:
 
 * **Windows (PowerShell)**:
   ```powershell
@@ -134,8 +95,8 @@ Simulate any demo simply by passing the `-Demo` configuration variable:
   ./scripts/simulate.sh -d netx_trng_console
   ```
 
-#### Deterministic Seeding Option:
-For deterministic execution and repeatable TRNG random sequences in simulation, pass `-Seed <number>`:
+#### Deterministic Execution with Random Seeds:
+To ensure reproducible test runs, you can specify a pseudo-random seed. For example, seed `12345` produces a verified, deterministic hardware entropy sequence:
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\simulate.ps1 -Demo netx_trng_console -Seed 12345
 ```
@@ -144,82 +105,121 @@ powershell -ExecutionPolicy Bypass -File .\scripts\simulate.ps1 -Demo netx_trng_
 ```
 
 ### 2. Headless Automated Regression Testing (CI/CD)
-The project provides headless test runners (`test_headless.ps1` and `test_headless.sh`) designed for continuous integration pipelines without a graphical display. The runner boots the simulation, monitors the virtual UART logs, and exits with code `0` on success or code `1` on timeout/failure.
+Headless testing is designed for automated continuous integration pipelines. The runner boots the simulation, monitors the virtual UART logs, and exits with code `0` on success or code `1` on failure/timeout.
 
+#### Direct Python Runner (Matches CI):
+```bash
+# Verify ThreadX basic scheduling & timers
+python ./scripts/test_renode.py --demo threadx_basic
+
+# Verify NetX Duo ICMP ping, UDP echo, and TCP echo
+python ./scripts/test_renode.py --demo netx_echo
+
+# Verify Hardware TRNG entropy generation and remote console
+python ./scripts/test_renode.py --demo netx_trng_console --seed 12345
+```
+
+#### Convenience Shell Wrappers:
 * **Windows (PowerShell)**:
   ```powershell
-  powershell -ExecutionPolicy Bypass -File .\scripts\test_headless.ps1
+  powershell -ExecutionPolicy Bypass -File .\scripts\test_headless.ps1 -Demo threadx_basic
+  powershell -ExecutionPolicy Bypass -File .\scripts\test_headless.ps1 -Demo netx_echo
+  powershell -ExecutionPolicy Bypass -File .\scripts\test_headless.ps1 -Demo netx_trng_console -Seed 12345
   ```
 * **Linux / macOS (Bash)**:
   ```bash
-  chmod +x ./scripts/test_headless.sh
-  ./scripts/test_headless.sh
+  ./scripts/test_headless.sh --demo threadx_basic
+  ./scripts/test_headless.sh --demo netx_echo
+  ./scripts/test_headless.sh --demo netx_trng_console --seed 12345
   ```
 
-Test any specific demo headlessly:
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\test_headless.ps1 -Demo threadx_basic -TimeoutSeconds 8
+---
+
+## Simulation Scope & Hardware Status
+
+> [!WARNING]
+> **Hardware Status: Verified in simulation, not yet on physical silicon.**
+> All automated tests in this repository currently run under **Antmicro Renode** system emulation.
+
+### What Renode Accurately Simulates:
+* **Boot & Vector Table**: Boots from simulated FlexSPI NOR Flash into Cortex-M7 privileged mode.
+* **ThreadX RTOS Kernel**: Preemptive priority scheduling, thread synchronization (mutexes, semaphores), and software timer ticks.
+* **NetX Duo Networking**: Ethernet MAC (`ENET`) DMA transfers, ARP cache handling, ICMP ping replies, UDP socket datagrams, and TCP stream connections.
+* **Hardware TRNG Peripheral**: 32-bit entropy generation via on-chip registers at `0x400CC000`.
+
+### What Renode Stubs:
+* **Clock Tree & PLLs**: Renode uses stub tags for the Clock Control Module (`CCM`) and `ANALOG` power blocks. Registers return fixed default values (e.g. `CCM_CBCDR` returns `0x000A8200`), so PLL lock loops succeed unconditionally without exercising analog timing.
+* **Core Frequency**: The `600 MHz` banner in the console is a compile-time SDK constant (`SystemCoreClock`), not a measured silicon frequency.
+* **Pin Multiplexing**: `IOMUXC` and `IOMUXC_GPR` writes are acknowledged without modeling electrical pin drive strengths or pin collisions.
+
+---
+
+## Target Hardware & Flashing Guide
+
+If you are flashing to a physical **NXP MIMXRT1064-EVK** board:
+
+### Hardware Specifications
+* **Evaluation Board**: NXP MIMXRT1064-EVK (ARM Cortex-M7 @ up to 600 MHz)
+* **Memory**: 4 MB on-chip FlexSPI NOR Flash (`0x70000000`), 1 MB on-chip SRAM (ITCM, DTCM, NonCacheable OCRAM)
+* **Serial Console**: LPUART1 via OpenSDA micro-USB (`J41`), 115,200 baud, 8N1
+* **User LED & Button**: Green LED `D18` (`GPIO1_IO09`), SW8 WAKEUP button (`GPIO5_IO00`)
+* **Ethernet**: ENET MAC + Microchip KSZ8081RNA PHY via RMII
+* **TRNG Hardware**: On-chip True Random Number Generator (`0x400CC000`)
+
+### Boot Switch Configuration
+Set boot switches **SW7** for **Internal Boot (FlexSPI NOR Flash)**:
+* `SW7-1`: OFF
+* `SW7-2`: ON
+* `SW7-3`: OFF
+* `SW7-4`: ON
+
+### Flashing Methods
+
+#### Option 1: OpenSDA Drag-and-Drop (Fastest)
+1. Connect micro-USB cable to `J41` on the EVK board.
+2. The board mounts as a USB drive named `RT1064-EVK`.
+3. Copy `build/app/demos/<demo_name>/mimxrt1064_threadx.bin` and paste it directly onto the drive.
+4. The OpenSDA LED blinks rapidly during flashing. Press `SW3` (RESET) to boot.
+
+#### Option 2: SEGGER J-Link
+```text
+JLink.exe -device MIMXRT1064xxx6A -if SWD -speed 4000 -autoconnect 1
+loadfile build/app/demos/<demo_name>/mimxrt1064_threadx.hex
+r
+g
 ```
 
----
+#### Option 3: pyOCD Command Line
+```bash
+pip install pyocd && pyocd pack install MIMXRT1064
+pyocd flash -t mimxrt1064 build/app/demos/<demo_name>/mimxrt1064_threadx.hex
+```
 
-## Physical Board Deployment & Flashing
-
-> [!NOTE]
-> **Hardware Status**: Not verified on hardware. Flashing instructions below represent the standard manufacturer procedure.
-
-When flashing to physical hardware, ensure the EVK board boot mode switches (`SW7`: `1-OFF, 2-ON, 3-OFF, 4-ON`) are configured for **Internal Boot (FlexSPI NOR Flash)**. Connect your PC to the OpenSDA USB port (`J41`).
-
-### Flashing Method 1: OpenSDA Drag-and-Drop (DAP-Link)
-1. Connect the EVK board to your PC via micro-USB connector `J41`.
-2. The onboard OpenSDA circuit mounts as a USB mass storage drive (e.g., `RT1064-EVK`).
-3. Copy `build/app/demos/<demo_name>/mimxrt1064_threadx.bin` and paste it directly into the `RT1064-EVK` drive.
-4. The OpenSDA LED blinks rapidly during programming. Once complete, press the `SW3` (RESET) button to boot.
-
-### Flashing Method 2: SEGGER J-Link
-If using a SEGGER J-Link probe (or OpenSDA programmed with J-Link firmware):
-1. Connect via J-Link Commander:
-   ```text
-   JLink.exe -device MIMXRT1064xxx6A -if SWD -speed 4000 -autoconnect 1
-   ```
-2. Flash the raw binary or hex file:
-   ```text
-   loadfile build/app/demos/<demo_name>/mimxrt1064_threadx.hex
-   r
-   g
-   ```
-
-### Flashing Method 3: pyOCD Command Line
-Using the open-source pyOCD programmer:
-1. Install pyOCD and the NXP device pack:
-   ```bash
-   pip install pyocd && pyocd pack install MIMXRT1064
-   ```
-2. Program the target:
-   ```bash
-   pyocd flash -t mimxrt1064 build/app/demos/<demo_name>/mimxrt1064_threadx.hex
-   ```
-
-### Flashing Method 4: NXP MCUXpresso IDE / GUI Flash Tool
-1. Open MCUXpresso IDE and select **GUI Flash Tool** from the toolbar.
-2. Select target device `MIMXRT1064xxxxA` and target memory `PROGRAM_FLASH` (`0x70000000`).
-3. Select `build/app/demos/<demo_name>/mimxrt1064_threadx.elf` (or `.bin`) and click **Program**.
+#### Option 4: NXP MCUXpresso IDE / GUI Flash Tool
+1. In MCUXpresso IDE, select **GUI Flash Tool** from the toolbar.
+2. Choose target device `MIMXRT1064xxxxA` and memory `PROGRAM_FLASH` (`0x70000000`).
+3. Select `build/app/demos/<demo_name>/mimxrt1064_threadx.elf` and click **Program**.
 
 ---
 
-## Developer Guide: How to Add a New Demo
+## Software Architecture & Developer Guide
 
-The decoupled architecture of `board_bsp` makes adding custom applications straightforward:
+### Modular BSP Architecture
+The target features a decoupled, three-tier design:
+* **`mimxrt1064_bsp`**: Clean C hardware abstraction layer (`bsp/board.h`, `bsp/led.h`, `bsp/console.h`). Application code interacts solely through BSP APIs rather than raw vendor registers.
+* **`board_bsp`**: Startup assembly (`startup_mimxrt1064.S`), low-level ThreadX initialization (`tx_initialize_low_level.S`), newlib standard C library syscalls (`_sbrk` heap protection), and hardware TRNG drivers.
+* **`mimxrt1064_common`**: Central CMake `INTERFACE` library propagating required MCU compiler definitions (`CPU_MIMXRT1064DVL6A`, `XIP_EXTERNAL_FLASH=1`, etc.) and SDK include directories to all targets automatically.
 
-### Step 1: Create the Demo Directory
+### Adding a Custom Demo in 4 Steps
+
+#### Step 1: Create the Demo Directory
 Create a folder under `app/demos/` (e.g., `app/demos/my_new_demo/`).
 
-### Step 2: Write Application Code
-Create `main.c` utilizing the standard BSP API:
+#### Step 2: Write Application Code (`main.c`)
 ```c
-#include <bsp/board.h>
-#include <bsp/led.h>
-#include <bsp/console.h>
+#include "bsp/board.h"
+#include "bsp/led.h"
+#include "bsp/console.h"
 #include "tx_api.h"
 
 int main(void)
@@ -233,33 +233,33 @@ int main(void)
 }
 ```
 
-### Step 3: Create `CMakeLists.txt`
-In your demo directory:
+#### Step 3: Create `CMakeLists.txt`
+Thanks to CMake target inheritance, you only need to link `board_bsp`, `threadx`, and `mcux_sdk` — all compiler definitions and SDK include paths are inherited automatically:
 ```cmake
 set(DEMO_TARGET "demo_my_new_demo")
-add_executable(${DEMO_TARGET}
-    main.c
-)
+add_executable(${DEMO_TARGET} main.c)
 set_target_properties(${DEMO_TARGET} PROPERTIES OUTPUT_NAME "mimxrt1064_threadx")
 
+# Only private demo includes are needed; SDK headers and board definitions
+# are inherited automatically from board_bsp.
 target_include_directories(${DEMO_TARGET} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/../..
 )
 
 target_link_libraries(${DEMO_TARGET} PRIVATE
     board_bsp
     threadx
-    # netxduo             # Uncomment if using network
-    # netx_imxrt_driver   # Uncomment if using network
+    mcux_sdk
+    # netxduo             # Uncomment if using network stack
+    # netx_imxrt_driver   # Uncomment if using network driver
 )
 
 set_target_linker(${DEMO_TARGET} "${CMAKE_CURRENT_SOURCE_DIR}/../../startup/MIMXRT1064xxxxx_flexspi_nor.ld")
 post_build(${DEMO_TARGET})
 ```
 
-### Step 4: Build and Simulate
+#### Step 4: Build and Simulate
 ```bash
-cmake -DACTIVE_DEMO=my_new_demo -B build -G Ninja
+cmake -B build -G Ninja -DACTIVE_DEMO=my_new_demo
 cmake --build build
 ```
