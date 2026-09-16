@@ -1,13 +1,24 @@
 # NXP i.MX RT1064-EVK Board Enablement Demos
 
-This directory contains the Board Support Package (BSP) and build configurations for running the **Eclipse ThreadX RTOS** and **NetX Duo TCP/IP stack** on the **NXP i.MX RT1064-EVK** evaluation board (ARM Cortex-M7 @ 600 MHz).
+This directory contains the Board Support Package and build configurations for running the **Eclipse ThreadX RTOS** and **NetX Duo TCP/IP stack** on the **NXP i.MX RT1064-EVK** evaluation board.
 
-The project features a decoupled Board Support Package (`board_bsp`) that hides all low-level hardware initializations (clocks, power, caches, MPU regions, pin muxing, Ethernet MAC/PHY descriptors, and on-chip cryptographic peripherals) from the high-level application code.
+The project features a decoupled Board Support Package (`board_bsp`) that hides all low-level hardware initializations from the high-level application code (clocks, power, caches, MPU regions, pin muxing, Ethernet MAC/PHY descriptors, and on-chip cryptographic peripherals).
 
-> [!NOTE]
-> **Hardware Verification Status**: *Simulated in Renode, Pending Physical Hardware Verification*
->
-> All peripheral drivers, hardware cryptographic subsystems, and network stacks documented in this repository have been fully verified under multi-node system emulation in Antmicro Renode. Flashing instructions for physical silicon follow standard NXP OpenSDA, Segger J-Link, pyOCD, and MCUXpresso workflows as detailed in the [Physical Board Deployment & Flashing](#physical-board-deployment--flashing) section below.
+> [!WARNING]
+> **Verification Status: Not verified on hardware.**
+> All automated tests currently run exclusively under **Antmicro Renode** system emulation.
+
+### Emulation Scope & Boundaries
+
+#### What Renode Verifies:
+* **Boot & Execution**: The image boots from simulated FlexSPI NOR Flash into ARM Cortex-M7 privileged mode.
+* **ThreadX RTOS Kernel**: Preemptive thread scheduling, thread synchronization, and software timers operate correctly.
+* **NetX Duo Networking**: Full TCP/IP operation over Renode's Ethernet (`ENET`) model, verified through multi-node ICMP ping, UDP echo, and TCP streaming across a virtual switch.
+
+#### What Renode Does Not Model:
+* **Clock Tree & PLLs**: Renode uses stub peripherals (`Tag`) for the Clock Control Module (`CCM`) and `ANALOG` blocks. Registers like `CCM_CBCDR` return fixed values (e.g. `0x000A8200`), meaning PLL lock sequences and clock gating succeed unconditionally without exercising silicon timing.
+* **Core Frequency**: The `600 MHz` displayed in the boot banner is the SDK's compile-time configuration constant (`SystemCoreClock`), not a measured hardware frequency.
+* **Pin Muxing & Reset Controller**: `IOMUXC`, `IOMUXC_GPR`, `SRC`, and `OCOTP` are stubbed and answer unconditionally.
 
 ---
 
@@ -155,7 +166,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\test_headless.ps1 -Demo threa
 ## Physical Board Deployment & Flashing
 
 > [!NOTE]
-> *Simulated in Renode, Pending Physical Hardware Verification*
+> **Hardware Status**: Not verified on hardware. Flashing instructions below represent the standard manufacturer procedure.
 
 When flashing to physical hardware, ensure the EVK board boot mode switches (`SW7`: `1-OFF, 2-ON, 3-OFF, 4-ON`) are configured for **Internal Boot (FlexSPI NOR Flash)**. Connect your PC to the OpenSDA USB port (`J41`).
 
@@ -213,7 +224,7 @@ Create `main.c` utilizing the standard BSP API:
 
 int main(void)
 {
-    /* Initialize MPU, 600 MHz system clocks, pins, LED, and console */
+    /* Initialize MPU, system clocks, pins, LED, and console */
     bsp_board_init();
 
     /* Enter ThreadX RTOS Kernel */
