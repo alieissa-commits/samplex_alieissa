@@ -137,12 +137,13 @@ echo "[OK] Board support files verified & downloaded"
 echo ""
 
 # 3. Fetch CMSIS Core headers (pinned ARM.CMSIS 5.9.0 release pack from ARM-software/CMSIS_5)
-CMSIS_PACK_URL="https://github.com/ARM-software/CMSIS_5/releases/download/5.9.0/ARM.CMSIS.5.9.0.pack"
+CMSIS_VERSION="5.9.0"
+CMSIS_PACK_URL="https://github.com/ARM-software/CMSIS_5/releases/download/${CMSIS_VERSION}/ARM.CMSIS.${CMSIS_VERSION}.pack"
 CMSIS_PACK_SHA256="14b366f2821ee5d32f0d3bf48ef9657ca45347261d0531263580848e9d36f8f4"
 CMSIS_PACK_ZIP="${TEMP_DIR}/cmsis.zip"
 CMSIS_EXTRACT="${TEMP_DIR}/cmsis_extracted"
 
-echo "[INFO] Downloading official ARM CMSIS Pack (v5.9.0)..."
+echo "[INFO] Downloading official ARM CMSIS Pack (v${CMSIS_VERSION})..."
 fetch_and_verify "${CMSIS_PACK_URL}" "${CMSIS_PACK_ZIP}" "${CMSIS_PACK_SHA256}"
 echo "[OK] ARM CMSIS Pack verified (SHA256: ${CMSIS_PACK_SHA256})"
 

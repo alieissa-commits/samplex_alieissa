@@ -195,12 +195,13 @@ try {
     Write-Host ""
 
     # 3. Fetch CMSIS Core headers (pinned ARM.CMSIS 5.9.0 release pack from ARM-software/CMSIS_5)
-    $cmsisPackUrl = "https://github.com/ARM-software/CMSIS_5/releases/download/5.9.0/ARM.CMSIS.5.9.0.pack"
+    $cmsisVersion = "5.9.0"
+    $cmsisPackUrl = "https://github.com/ARM-software/CMSIS_5/releases/download/$cmsisVersion/ARM.CMSIS.$cmsisVersion.pack"
     $cmsisPackSha256 = "14b366f2821ee5d32f0d3bf48ef9657ca45347261d0531263580848e9d36f8f4"
     $cmsisPackZip = Join-Path $TempDir "cmsis.zip"
     $cmsisExtract = Join-Path $TempDir "cmsis_extracted"
 
-    Write-Host "[INFO] Downloading official ARM CMSIS Pack (v5.9.0)..."
+    Write-Host "[INFO] Downloading official ARM CMSIS Pack (v$cmsisVersion)..."
     Download-WithRetry -Uri $cmsisPackUrl -OutFile $cmsisPackZip -ExpectedHash $cmsisPackSha256
     Write-Host "[OK] ARM CMSIS Pack verified (SHA256: $cmsisPackSha256)"
 

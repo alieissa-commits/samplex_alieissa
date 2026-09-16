@@ -271,6 +271,8 @@ jobs:
     env:
       GCC_VERSION: 14.3.rel1
       GCC_TARGET: arm-none-eabi
+      CMSIS_VERSION: 5.9.0
+      NXP_DFP_VERSION: 15.1.0
 
     steps:
       - name: Checkout Repository
@@ -311,7 +313,15 @@ jobs:
       - name: Report the toolchain version
         run: ${{ env.GCC_TARGET }}-gcc --version
 
+      - name: Cache NXP SDK & CMSIS Dependencies
+        id: cache-nxp-sdk
+        uses: actions/cache@v4
+        with:
+          path: targets/NXP/MIMXRT1064-EVK/lib/mcux-sdk
+          key: nxp-sdk-${{ env.NXP_DFP_VERSION }}-cmsis-${{ env.CMSIS_VERSION }}-${{ hashFiles('targets/NXP/MIMXRT1064-EVK/scripts/fetch_sdk.sh') }}
+
       - name: Fetch NXP SDK & CMSIS Dependencies
+        if: steps.cache-nxp-sdk.outputs.cache-hit != 'true'
         run: |
           bash targets/NXP/MIMXRT1064-EVK/scripts/fetch_sdk.sh
 
