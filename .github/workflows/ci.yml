@@ -12,7 +12,7 @@ name: SampleX CI Verification Pipeline
 
 on:
   push:
-    branches: [ main, master, dev, 'feat/**', 'test/**' ]
+    branches: [ main, master, dev, 'feat/**' ]
   pull_request:
     branches: [ main, master, dev ]
   workflow_dispatch:
