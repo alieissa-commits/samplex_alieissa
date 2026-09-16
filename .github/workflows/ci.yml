@@ -12,7 +12,7 @@ name: SampleX CI Verification Pipeline
 
 on:
   push:
-    branches: [ main, master, dev, 'feat/**', 'test/**' ]
+    branches: [ main, master, dev, 'feat/**' ]
   pull_request:
     branches: [ main, master, dev ]
   workflow_dispatch:
@@ -271,6 +271,8 @@ jobs:
     env:
       GCC_VERSION: 14.3.rel1
       GCC_TARGET: arm-none-eabi
+      CMSIS_VERSION: 5.9.0
+      NXP_DFP_VERSION: 15.1.0
 
     steps:
       - name: Checkout Repository
@@ -311,28 +313,36 @@ jobs:
       - name: Report the toolchain version
         run: ${{ env.GCC_TARGET }}-gcc --version
 
+      - name: Cache NXP SDK & CMSIS Dependencies
+        id: cache-nxp-sdk
+        uses: actions/cache@v4
+        with:
+          path: targets/NXP/MIMXRT1064-EVK/lib/mcux-sdk
+          key: nxp-sdk-${{ env.NXP_DFP_VERSION }}-cmsis-${{ env.CMSIS_VERSION }}-${{ hashFiles('targets/NXP/MIMXRT1064-EVK/scripts/fetch_sdk.sh') }}
+
       - name: Fetch NXP SDK & CMSIS Dependencies
+        if: steps.cache-nxp-sdk.outputs.cache-hit != 'true'
         run: |
-          bash NXP/MIMXRT1064-EVK/scripts/fetch_sdk.sh
+          bash targets/NXP/MIMXRT1064-EVK/scripts/fetch_sdk.sh
 
       - name: Build All NXP MIMXRT1064-EVK Demos
         run: |
-          bash NXP/MIMXRT1064-EVK/scripts/build.sh --demo all --rebuild
+          bash targets/NXP/MIMXRT1064-EVK/scripts/build.sh --demo all --rebuild
 
       - name: Verify Built NXP ELFs
         run: |
-          test -f NXP/MIMXRT1064-EVK/build/app/demos/threadx_basic/mimxrt1064_threadx.elf
-          test -f NXP/MIMXRT1064-EVK/build/app/demos/netx_echo/mimxrt1064_threadx.elf
-          test -f NXP/MIMXRT1064-EVK/build/app/demos/netx_echo/mimxrt1064_client.elf
-          test -f NXP/MIMXRT1064-EVK/build/app/demos/netx_trng_console/mimxrt1064_threadx.elf
-          test -f NXP/MIMXRT1064-EVK/build/app/demos/netx_trng_console/mimxrt1064_client.elf
+          test -f targets/NXP/MIMXRT1064-EVK/build/app/demos/threadx_basic/mimxrt1064_threadx.elf
+          test -f targets/NXP/MIMXRT1064-EVK/build/app/demos/netx_echo/mimxrt1064_threadx.elf
+          test -f targets/NXP/MIMXRT1064-EVK/build/app/demos/netx_echo/mimxrt1064_client.elf
+          test -f targets/NXP/MIMXRT1064-EVK/build/app/demos/netx_trng_console/mimxrt1064_threadx.elf
+          test -f targets/NXP/MIMXRT1064-EVK/build/app/demos/netx_trng_console/mimxrt1064_client.elf
           echo "[OK] All NXP MIMXRT1064-EVK demo ELFs verified."
 
       - name: Archive Built NXP ELFs
         uses: actions/upload-artifact@v4
         with:
           name: nxp-mimxrt1064-demo-elfs
-          path: NXP/MIMXRT1064-EVK/build/app/demos/
+          path: targets/NXP/MIMXRT1064-EVK/build/app/demos/
           retention-days: 1
 
   test-nxp-renode:
@@ -359,12 +369,12 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: nxp-mimxrt1064-demo-elfs
-          path: NXP/MIMXRT1064-EVK/build/app/demos
+          path: targets/NXP/MIMXRT1064-EVK/build/app/demos
 
       - name: Inspect Downloaded ELF Artifacts
         run: |
           echo "=== Extracted NXP Demo ELF Artifacts ==="
-          ls -laR NXP/MIMXRT1064-EVK/build/app/demos/
+          ls -laR targets/NXP/MIMXRT1064-EVK/build/app/demos/
 
       - name: Cache the portable Renode environment
         id: cache-renode
@@ -410,15 +420,15 @@ jobs:
 
       - name: Run Deterministic Headless Renode Test (threadx_basic)
         run: |
-          python3 NXP/MIMXRT1064-EVK/scripts/test_renode.py --demo threadx_basic
+          python3 targets/NXP/MIMXRT1064-EVK/scripts/test_renode.py --demo threadx_basic
 
       - name: Run Deterministic Headless Renode Test (netx_echo)
         run: |
-          python3 NXP/MIMXRT1064-EVK/scripts/test_renode.py --demo netx_echo
+          python3 targets/NXP/MIMXRT1064-EVK/scripts/test_renode.py --demo netx_echo
 
       - name: Run Deterministic Headless Renode Test (netx_trng_console)
         run: |
-          python3 NXP/MIMXRT1064-EVK/scripts/test_renode.py --demo netx_trng_console --seed 12345
+          python3 targets/NXP/MIMXRT1064-EVK/scripts/test_renode.py --demo netx_trng_console --seed 12345
 
       - name: Upload Renode Execution Logs
         if: always()
@@ -426,7 +436,7 @@ jobs:
         with:
           name: nxp-renode-execution-logs
           path: |
-            NXP/MIMXRT1064-EVK/build/*.log
-            NXP/MIMXRT1064-EVK/*.log
+            targets/NXP/MIMXRT1064-EVK/build/*.log
+            targets/NXP/MIMXRT1064-EVK/*.log
           if-no-files-found: ignore
 
