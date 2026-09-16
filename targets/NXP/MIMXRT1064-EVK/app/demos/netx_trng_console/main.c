@@ -270,6 +270,17 @@ static void shell_thread_entry(ULONG thread_input)
                 }
 
                 ULONG bytes_copied = 0;
+
+                /* nx_packet_data_retrieve copies the whole chain and takes no
+                   destination size, so an over-long line is refused, not truncated. */
+                if (packet_ptr->nx_packet_length >= sizeof(line_buffer))
+                {
+                    nx_packet_release(packet_ptr);
+                    send_tcp_response(&shell_socket,
+                        "[ERROR] Command line too long\r\n\r\nmimxrt1064> ");
+                    continue;
+                }
+
                 status = nx_packet_data_retrieve(packet_ptr, line_buffer, &bytes_copied);
                 nx_packet_release(packet_ptr);
 
@@ -278,10 +289,6 @@ static void shell_thread_entry(ULONG thread_input)
                     continue;
                 }
 
-                if (bytes_copied >= sizeof(line_buffer))
-                {
-                    bytes_copied = sizeof(line_buffer) - 1;
-                }
                 line_buffer[bytes_copied] = '\0';
 
                 /* Safe trimming of trailing CRLF and spaces without pointer underflow */

@@ -229,11 +229,10 @@ static void client_thread_entry(ULONG thread_input)
                     {
                         CHAR rx_buf[128];
                         ULONG bytes_copied = 0;
-                        nx_packet_data_retrieve(rx_packet, rx_buf, &bytes_copied);
-                        if (bytes_copied >= sizeof(rx_buf))
-                        {
-                            bytes_copied = sizeof(rx_buf) - 1;
-                        }
+
+                        /* Bounded extract: a response longer than the buffer is truncated. */
+                        nx_packet_data_extract_offset(rx_packet, 0, rx_buf,
+                                                      (ULONG)(sizeof(rx_buf) - 1), &bytes_copied);
                         rx_buf[bytes_copied] = '\0';
                         printf(TAG_CLIENT " " MSG_SUCCESS "[PASS] Received UDP Echo: '%s' (%lu bytes)\r\n" ANSI_RESET,
                                rx_buf, bytes_copied);
@@ -298,11 +297,10 @@ static void client_thread_entry(ULONG thread_input)
                         {
                             CHAR rx_buf[128];
                             ULONG bytes_copied = 0;
-                            nx_packet_data_retrieve(rx_packet, rx_buf, &bytes_copied);
-                            if (bytes_copied >= sizeof(rx_buf))
-                            {
-                                bytes_copied = sizeof(rx_buf) - 1;
-                            }
+
+                            /* Bounded extract: a response longer than the buffer is truncated. */
+                            nx_packet_data_extract_offset(rx_packet, 0, rx_buf,
+                                                          (ULONG)(sizeof(rx_buf) - 1), &bytes_copied);
                             rx_buf[bytes_copied] = '\0';
                             printf(TAG_CLIENT " " MSG_SUCCESS "[PASS] Received TCP Echo: '%s' (%lu bytes)\r\n" ANSI_RESET,
                                    rx_buf, bytes_copied);

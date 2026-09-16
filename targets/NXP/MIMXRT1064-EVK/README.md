@@ -146,12 +146,12 @@ python ./scripts/test_renode.py --demo netx_trng_console --seed 12345
 * **Boot & Vector Table**: Boots from simulated FlexSPI NOR Flash into Cortex-M7 privileged mode.
 * **ThreadX RTOS Kernel**: Preemptive priority scheduling, thread synchronization (mutexes, semaphores), and software timer ticks.
 * **NetX Duo Networking**: Ethernet MAC (`ENET`) DMA transfers, ARP cache handling, ICMP ping replies, UDP socket datagrams, and TCP stream connections.
-* **Hardware TRNG Peripheral**: 32-bit entropy generation via on-chip registers at `0x400CC000`.
 
 ### What Renode Stubs:
 * **Clock Tree & PLLs**: Renode uses stub tags for the Clock Control Module (`CCM`) and `ANALOG` power blocks. Registers return fixed default values (e.g. `CCM_CBCDR` returns `0x000A8200`), so PLL lock loops succeed unconditionally without exercising analog timing.
 * **Core Frequency**: The `600 MHz` banner in the console is a compile-time SDK constant (`SystemCoreClock`), not a measured silicon frequency.
 * **Pin Multiplexing**: `IOMUXC` and `IOMUXC_GPR` writes are acknowledged without modeling electrical pin drive strengths or pin collisions.
+* **TRNG Bring-up and Entropy Semantics**: Renode's `IMX_TRNG` model implements neither the programming sequence nor the block-consume semantics, and logs `Unhandled write` for `MCTL[PRGM]`, `MCTL[RST_DEF]` and `SDCTL[SAMP_SIZE]`/`SDCTL[ENT_DLY]`. It also returns a fresh pseudo-random word on *any* `ENT[n]` read, whereas silicon refills the block only when `ENT15` is read and re-arms `ENT_VAL`. The driver follows the reference manual on both points, but the emulator would accept a driver that does neither, so this is the part of the target most in need of a run on real hardware.
 
 ---
 

@@ -134,11 +134,10 @@ static UINT send_and_receive(NX_TCP_SOCKET *socket, const char *cmd, char *rx_bu
     if (status == NX_SUCCESS && rx_packet != NX_NULL)
     {
         ULONG bytes_copied = 0;
-        nx_packet_data_retrieve(rx_packet, rx_buf, &bytes_copied);
-        if (bytes_copied >= rx_buf_size)
-        {
-            bytes_copied = rx_buf_size - 1;
-        }
+
+        /* Bounded extract: a response longer than the buffer is truncated. */
+        nx_packet_data_extract_offset(rx_packet, 0, rx_buf,
+                                      (ULONG)(rx_buf_size - 1), &bytes_copied);
         rx_buf[bytes_copied] = '\0';
         nx_packet_release(rx_packet);
     }
@@ -169,7 +168,7 @@ static void client_test_thread_entry(ULONG thread_input)
     printf(ANSI_BOLD ANSI_CYAN "==================================================\r\n\r\n" ANSI_RESET);
 
     /* Test 1: ICMP Ping */
-    printf(TAG_CLIENT " [Test 1/5] Testing ICMP Ping to 192.168.0.100...\r\n");
+    printf(TAG_CLIENT " [Test 1/6] Testing ICMP Ping to 192.168.0.100...\r\n");
     NX_PACKET *ping_resp = NX_NULL;
     status = nx_icmp_ping(&client_ip, SERVER_IP_ADDRESS, "TRNG_Ping", 9, &ping_resp, 200);
     if (status == NX_SUCCESS && ping_resp != NX_NULL)
@@ -186,7 +185,7 @@ static void client_test_thread_entry(ULONG thread_input)
     tx_thread_sleep(30);
 
     /* Test 2: Connect to TCP Port 23 */
-    printf("\r\n" TAG_CLIENT " [Test 2/5] Connecting to TRNG Console Server on port %d...\r\n", CONSOLE_SERVER_PORT);
+    printf("\r\n" TAG_CLIENT " [Test 2/6] Connecting to TRNG Console Server on port %d...\r\n", CONSOLE_SERVER_PORT);
     NX_TCP_SOCKET client_socket;
     status = nx_tcp_socket_create(&client_ip, &client_socket, "Client Shell Socket",
                                   NX_IP_NORMAL, NX_FRAGMENT_OKAY, NX_IP_TIME_TO_LIVE,
@@ -211,7 +210,7 @@ static void client_test_thread_entry(ULONG thread_input)
         }
 
         /* Test 3: Query Hardware TRNG Entropy */
-        printf("\r\n" TAG_CLIENT " [Test 3/5] Querying on-chip TRNG entropy ('trng')...\r\n");
+        printf("\r\n" TAG_CLIENT " [Test 3/6] Querying on-chip TRNG entropy ('trng')...\r\n");
         memset(buffer, 0, sizeof(buffer));
         status = send_and_receive(&client_socket, "trng\r\n", buffer, sizeof(buffer), 200);
 
@@ -243,7 +242,8 @@ static void client_test_thread_entry(ULONG thread_input)
                 printf(TAG_CLIENT " " MSG_SUCCESS " Hardware TRNG Entropy Received:\r\n  %s", buffer);
                 printf(TAG_CLIENT " " MSG_SUCCESS " Entropy words verified: 4 words parsed, non-zero, all mutually distinct.\r\n");
 
-                /* Verify exact sequence under deterministic Renode simulation (seed 12345) */
+                /* Renode's PRNG is deterministic, so under --seed 12345 these four
+                   words are a known sequence. Real silicon will not match them. */
                 const unsigned long seed_12345_w1 = 0x69D43FF3UL;
                 const unsigned long seed_12345_w2 = 0x54E900EEUL;
                 const unsigned long seed_12345_w3 = 0x2514F462UL;
@@ -252,6 +252,10 @@ static void client_test_thread_entry(ULONG thread_input)
                 if (w1 == seed_12345_w1 && w2 == seed_12345_w2 && w3 == seed_12345_w3 && w4 == seed_12345_w4)
                 {
                     printf(TAG_CLIENT " " MSG_SUCCESS " Deterministic seed (12345) PRNG sequence verified exactly!\r\n");
+                }
+                else
+                {
+                    printf(TAG_CLIENT " Entropy does not match the seed-12345 reference sequence, which is expected on hardware or under another seed.\r\n");
                 }
             }
         }
@@ -262,7 +266,7 @@ static void client_test_thread_entry(ULONG thread_input)
         }
 
         /* Test 4: Remote LED Control */
-        printf("\r\n" TAG_CLIENT " [Test 4/5] Testing Remote LED Control ('led toggle')...\r\n");
+        printf("\r\n" TAG_CLIENT " [Test 4/6] Testing Remote LED Control ('led toggle')...\r\n");
         memset(buffer, 0, sizeof(buffer));
         status = send_and_receive(&client_socket, "led toggle\r\n", buffer, sizeof(buffer), 200);
         if (status == NX_SUCCESS && strstr(buffer, "[LED] State: TOGGLED"))
@@ -276,7 +280,7 @@ static void client_test_thread_entry(ULONG thread_input)
         }
 
         /* Test 5: Target Info Query */
-        printf("\r\n" TAG_CLIENT " [Test 5/5] Querying processor and RTOS status ('info')...\r\n");
+        printf("\r\n" TAG_CLIENT " [Test 5/6] Querying processor and RTOS status ('info')...\r\n");
         memset(buffer, 0, sizeof(buffer));
         status = send_and_receive(&client_socket, "info\r\n", buffer, sizeof(buffer), 200);
         if (status == NX_SUCCESS && strstr(buffer, "MIMXRT1064-EVK"))
@@ -287,6 +291,41 @@ static void client_test_thread_entry(ULONG thread_input)
         {
             printf(TAG_CLIENT " " MSG_ERROR " Info query failed (status: 0x%02X)\r\n", status);
             all_passed = 0;
+        }
+
+        /* Test 6: an over-long line is refused and the session survives it */
+        printf("\r\n" TAG_CLIENT " [Test 6/6] Testing over-long command line rejection...\r\n");
+        {
+            char long_cmd[200];
+
+            memset(long_cmd, 'A', sizeof(long_cmd) - 3);
+            long_cmd[sizeof(long_cmd) - 3] = '\r';
+            long_cmd[sizeof(long_cmd) - 2] = '\n';
+            long_cmd[sizeof(long_cmd) - 1] = '\0';
+
+            memset(buffer, 0, sizeof(buffer));
+            status = send_and_receive(&client_socket, long_cmd, buffer, sizeof(buffer), 200);
+
+            if (status == NX_SUCCESS && strstr(buffer, "Command line too long"))
+            {
+                memset(buffer, 0, sizeof(buffer));
+                status = send_and_receive(&client_socket, "ping\r\n", buffer, sizeof(buffer), 200);
+                if (status == NX_SUCCESS && strstr(buffer, "[PONG]"))
+                {
+                    printf(TAG_CLIENT " " MSG_SUCCESS " Over-long line refused, session still responsive.\r\n");
+                }
+                else
+                {
+                    printf(TAG_CLIENT " " MSG_ERROR " Session unresponsive after over-long line (status: 0x%02X)\r\n", status);
+                    all_passed = 0;
+                }
+            }
+            else
+            {
+                printf(TAG_CLIENT " " MSG_ERROR " Over-long line was not refused (status: 0x%02X, response: '%s')\r\n",
+                       status, buffer);
+                all_passed = 0;
+            }
         }
 
         /* Graceful disconnect */
