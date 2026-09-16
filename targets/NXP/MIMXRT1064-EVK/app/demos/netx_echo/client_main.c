@@ -36,9 +36,9 @@
 #define GATEWAY_ADDRESS_VAL     IP_ADDRESS(192, 168, 0, 1)
 
 static TX_THREAD                client_thread;
-static uint8_t                  client_thread_stack[DEMO_STACK_SIZE];
+static ULONG                    client_thread_stack[DEMO_STACK_SIZE / sizeof(ULONG)];
 
-static uint8_t                  ip_thread_stack[DEMO_STACK_SIZE];
+static ULONG                    ip_thread_stack[DEMO_STACK_SIZE / sizeof(ULONG)];
 static uint8_t                  arp_cache_area[ARP_CACHE_SIZE];
 
 static NX_PACKET_POOL           client_pool;

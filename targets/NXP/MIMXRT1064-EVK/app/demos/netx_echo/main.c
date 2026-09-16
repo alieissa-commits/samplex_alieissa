@@ -34,15 +34,15 @@
 #define GATEWAY_ADDRESS_VAL     IP_ADDRESS(192, 168, 0, 1)
 
 static TX_THREAD                monitor_thread;
-static uint8_t                  monitor_thread_stack[DEMO_STACK_SIZE];
+static ULONG                    monitor_thread_stack[DEMO_STACK_SIZE / sizeof(ULONG)];
 
 static TX_THREAD                udp_echo_thread;
-static uint8_t                  udp_echo_thread_stack[DEMO_STACK_SIZE];
+static ULONG                    udp_echo_thread_stack[DEMO_STACK_SIZE / sizeof(ULONG)];
 
 static TX_THREAD                tcp_echo_thread;
-static uint8_t                  tcp_echo_thread_stack[DEMO_STACK_SIZE];
+static ULONG                    tcp_echo_thread_stack[DEMO_STACK_SIZE / sizeof(ULONG)];
 
-static uint8_t                  ip_thread_stack[DEMO_STACK_SIZE];
+static ULONG                    ip_thread_stack[DEMO_STACK_SIZE / sizeof(ULONG)];
 static uint8_t                  arp_cache_area[ARP_CACHE_SIZE];
 
 static NX_PACKET_POOL           pool_0;

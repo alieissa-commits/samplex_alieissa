@@ -23,4 +23,7 @@
 #define TX_TIMER_TICKS_PER_SECOND 100
 #endif
 
+/* Enable ThreadX runtime stack checking */
+#define TX_ENABLE_STACK_CHECKING
+
 #endif /* TX_USER_H */

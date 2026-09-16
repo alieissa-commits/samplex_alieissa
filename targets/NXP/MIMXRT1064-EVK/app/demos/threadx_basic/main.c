@@ -20,14 +20,14 @@
 #include "board_config.h"
 #include "tx_api.h"
 
-#define HEARTBEAT_THREAD_STACK_SIZE 1024
-#define WORKER_THREAD_STACK_SIZE    1024
+#define HEARTBEAT_THREAD_STACK_SIZE 2048
+#define WORKER_THREAD_STACK_SIZE    2048
 
 static TX_THREAD heartbeat_thread;
-static uint8_t heartbeat_thread_stack[HEARTBEAT_THREAD_STACK_SIZE];
+static ULONG heartbeat_thread_stack[HEARTBEAT_THREAD_STACK_SIZE / sizeof(ULONG)];
 
 static TX_THREAD worker_thread;
-static uint8_t worker_thread_stack[WORKER_THREAD_STACK_SIZE];
+static ULONG worker_thread_stack[WORKER_THREAD_STACK_SIZE / sizeof(ULONG)];
 
 static TX_TIMER app_timer;
 static volatile ULONG timer_fire_count = 0;
